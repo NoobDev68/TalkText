@@ -6,6 +6,8 @@ from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from .i18n import tr
+
 COLOR_IDLE = "#5b7cfa"
 COLOR_RECORDING = "#ff5c7a"
 
@@ -55,14 +57,14 @@ class Tray(QObject):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.available = QSystemTrayIcon.isSystemTrayAvailable()
+        self._recording = False
+        self._window_visible = True
         self._icon = QSystemTrayIcon(make_icon(False), self)
 
         menu = QMenu()
-        self.show_action = QAction("Скрыть окно")
-        self.record_action = QAction("Начать распознавание")
-        # Ссылка на атрибуте обязательна: QAction без владельца удаляется сборщиком мусора,
-        # и пункт молча исчезает из меню.
-        self.quit_action = QAction("Закрыть TalkText")
+        self.show_action = QAction(tr("tray.hide"))
+        self.record_action = QAction(tr("tray.start"))
+        self.quit_action = QAction(tr("tray.quit"))
         menu.addAction(self.show_action)
         menu.addAction(self.record_action)
         menu.addSeparator()
@@ -83,12 +85,19 @@ class Tray(QObject):
             self.toggle_window.emit()
 
     def set_recording(self, recording: bool) -> None:
+        self._recording = recording
         self._icon.setIcon(make_icon(recording))
-        self._icon.setToolTip("TalkText — слушаю" if recording else "TalkText — готов")
-        self.record_action.setText("Остановить распознавание" if recording else "Начать распознавание")
+        self._icon.setToolTip(tr("tray.tooltip.recording") if recording else tr("tray.tooltip.ready"))
+        self.record_action.setText(tr("tray.stop") if recording else tr("tray.start"))
 
     def set_window_visible(self, visible: bool) -> None:
-        self.show_action.setText("Скрыть окно" if visible else "Показать окно")
+        self._window_visible = visible
+        self.show_action.setText(tr("tray.hide") if visible else tr("tray.show"))
+
+    def retranslate(self) -> None:
+        self.set_recording(self._recording)
+        self.set_window_visible(self._window_visible)
+        self.quit_action.setText(tr("tray.quit"))
 
     def notify(self, message: str) -> None:
         if self.available:

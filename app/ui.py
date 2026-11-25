@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import models, paths
+from .i18n import current_language, set_language, tr
 from .settings import app_settings
 from .audio import Recorder
 from .dialogs import ModelsDialog
@@ -30,10 +31,10 @@ from .tray import Tray
 from .win import make_noactivate, paste_text
 
 MODE_CYCLE = [MODE_AUTO, MODE_RU, MODE_EN]
-MODE_LABELS = {
-    MODE_AUTO: "Авто RU/EN",
-    MODE_RU: "Русский",
-    MODE_EN: "English",
+MODE_KEYS = {
+    MODE_AUTO: "mode.auto",
+    MODE_RU: "mode.ru",
+    MODE_EN: "mode.en",
 }
 
 COMPACT_SIZE = (216, 252)
@@ -161,6 +162,7 @@ class MainWindow(QWidget):
         self.setMinimumSize(300, 100)
 
         self.settings = app_settings()
+        set_language(str(self.settings.value("language", "ru")))
         self.engines = Engines()
         self.recognizer = Recognizer(self.engines)
         self.recorder = Recorder()
@@ -236,19 +238,26 @@ class MainWindow(QWidget):
         self.settings_btn.setFixedSize(28, 28)
         self.settings_btn.setIcon(gear_icon())
         self.settings_btn.setIconSize(QSize(17, 17))
-        self.settings_btn.setToolTip("Настройки: движки и горячая клавиша")
+        self.settings_btn.setToolTip(tr("btn.settings.tip"))
+        self.language_btn = QPushButton("RU" if current_language() == "en" else "EN")
+        self.language_btn.setObjectName("tool")
+        self.language_btn.setFixedSize(28, 28)
+        self.language_btn.setCursor(Qt.PointingHandCursor)
+        self.language_btn.setToolTip(tr("btn.language.tip"))
+        self.language_btn.clicked.connect(self._toggle_language)
         self.compact_btn = QPushButton("⤡")
         self.compact_btn.setObjectName("tool")
         self.compact_btn.setFixedSize(28, 28)
-        self.compact_btn.setToolTip("Компактный режим")
+        self.compact_btn.setToolTip(tr("btn.compact.tip"))
         self.minimize_btn = QPushButton("—")
         self.minimize_btn.setObjectName("tool")
         self.minimize_btn.setFixedSize(28, 28)
-        self.minimize_btn.setToolTip("Свернуть в трей")
+        self.minimize_btn.setToolTip(tr("btn.minimize.tip"))
         close_btn = QPushButton("✕")
         close_btn.setObjectName("close")
         close_btn.setFixedSize(28, 28)
-        close_btn.setToolTip("Закрыть приложение")
+        close_btn.setToolTip(tr("btn.close.tip"))
+        header.addWidget(self.language_btn)
         header.addWidget(self.settings_btn)
         header.addWidget(self.compact_btn)
         header.addWidget(self.minimize_btn)
@@ -281,21 +290,21 @@ class MainWindow(QWidget):
         self.text = QTextEdit()
         self.text.setObjectName("text")
         self.text.setReadOnly(True)
-        self.text.setPlaceholderText(f"Нажмите ▶ или {self.hotkey.spec.label()} и говорите…")
+        self.text.setPlaceholderText(tr("placeholder", hotkey=self.hotkey.spec.label()))
         layout.addWidget(self.text, 1)
 
         footer = QHBoxLayout()
         footer.setSpacing(4)
-        self.copy_btn = QPushButton("Копировать")
+        self.copy_btn = QPushButton(tr("btn.copy"))
         self.copy_btn.setProperty("class", "small")
-        self.clear_btn = QPushButton("Очистить")
+        self.clear_btn = QPushButton(tr("btn.clear"))
         self.clear_btn.setProperty("class", "small")
         self.engine_btn = QPushButton()
         self.engine_btn.setObjectName("engine")
         self.engine_btn.setCursor(Qt.PointingHandCursor)
-        self.engine_btn.setToolTip("Клик — режим языка: Авто RU/EN → Русский → English")
-        self.insert_check = QCheckBox("Вставлять")
-        self.insert_check.setToolTip("Автоматически вставлять распознанный текст в активное окно")
+        self.engine_btn.setToolTip(tr("btn.engine.tip"))
+        self.insert_check = QCheckBox(tr("btn.insert"))
+        self.insert_check.setToolTip(tr("btn.insert.tip"))
         footer.addWidget(self.copy_btn)
         footer.addWidget(self.clear_btn)
         footer.addStretch(1)
@@ -303,10 +312,10 @@ class MainWindow(QWidget):
         footer.addWidget(self.insert_check)
         layout.addLayout(footer)
 
-        credits = QLabel("Создатели: ThreeR и DeepSeek")
-        credits.setStyleSheet("color: #8b93a7; font-size: 9.5pt;")
-        credits.setAlignment(Qt.AlignCenter)
-        layout.addWidget(credits)
+        self.credits = QLabel(tr("credits"))
+        self.credits.setStyleSheet("color: #8b93a7; font-size: 9.5pt;")
+        self.credits.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.credits)
 
         close_btn.clicked.connect(self._quit)
         return page
@@ -324,19 +333,19 @@ class MainWindow(QWidget):
         self.settings_btn_c.setFixedSize(24, 24)
         self.settings_btn_c.setIcon(gear_icon())
         self.settings_btn_c.setIconSize(QSize(14, 14))
-        self.settings_btn_c.setToolTip("Настройки")
+        self.settings_btn_c.setToolTip(tr("btn.settings.tip"))
         self.expand_btn = QPushButton("⤢")
         self.expand_btn.setObjectName("tool")
         self.expand_btn.setFixedSize(24, 24)
-        self.expand_btn.setToolTip("Полное окно с текстом")
+        self.expand_btn.setToolTip(tr("btn.expand.tip"))
         self.minimize_btn_c = QPushButton("—")
         self.minimize_btn_c.setObjectName("tool")
         self.minimize_btn_c.setFixedSize(24, 24)
-        self.minimize_btn_c.setToolTip("Свернуть в трей")
+        self.minimize_btn_c.setToolTip(tr("btn.minimize.tip"))
         close_btn = QPushButton("✕")
         close_btn.setObjectName("close")
         close_btn.setFixedSize(24, 24)
-        close_btn.setToolTip("Закрыть приложение")
+        close_btn.setToolTip(tr("btn.close.tip"))
         top.addWidget(self.settings_btn_c)
         top.addWidget(self.expand_btn)
         top.addStretch(1)
@@ -358,7 +367,7 @@ class MainWindow(QWidget):
         self.hotkey_hint = QLabel(self.hotkey.spec.label())
         self.hotkey_hint.setObjectName("hotkeyHint")
         self.hotkey_hint.setAlignment(Qt.AlignCenter)
-        self.hotkey_hint.setToolTip("Текущая горячая клавиша (меняется в настройках)")
+        self.hotkey_hint.setToolTip(tr("hotkey.tip"))
         layout.addWidget(self.hotkey_hint)
 
         self.status_compact = QLabel("Готов")
@@ -374,7 +383,7 @@ class MainWindow(QWidget):
         self.engine_btn_compact = QPushButton()
         self.engine_btn_compact.setObjectName("engineCompact")
         self.engine_btn_compact.setCursor(Qt.PointingHandCursor)
-        self.engine_btn_compact.setToolTip("Клик — режим языка: Авто → Русский → English")
+        self.engine_btn_compact.setToolTip(tr("btn.engine.tip"))
         self.engine_btn_compact.setMinimumHeight(28)
         layout.addWidget(self.engine_btn_compact)
 
@@ -462,6 +471,37 @@ class MainWindow(QWidget):
         y = min(max(self.y(), area.top()), area.bottom() - self.height())
         self.move(x, y)
 
+    def _toggle_language(self) -> None:
+        lang = "en" if current_language() == "ru" else "ru"
+        set_language(lang)
+        self.settings.setValue("language", lang)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        self.settings_btn.setToolTip(tr("btn.settings.tip"))
+        self.language_btn.setText("RU" if current_language() == "en" else "EN")
+        self.language_btn.setToolTip(tr("btn.language.tip"))
+        self.compact_btn.setToolTip(tr("btn.compact.tip"))
+        self.minimize_btn.setToolTip(tr("btn.minimize.tip"))
+        self.settings_btn_c.setToolTip(tr("btn.settings.tip"))
+        self.expand_btn.setToolTip(tr("btn.expand.tip"))
+        self.minimize_btn_c.setToolTip(tr("btn.minimize.tip"))
+        self.hotkey_hint.setToolTip(tr("hotkey.tip"))
+        self.copy_btn.setText(tr("btn.copy"))
+        self.clear_btn.setText(tr("btn.clear"))
+        self.insert_check.setText(tr("btn.insert"))
+        self.insert_check.setToolTip(tr("btn.insert.tip"))
+        self.engine_btn.setToolTip(tr("btn.engine.tip"))
+        self.engine_btn_compact.setToolTip(tr("btn.engine.tip"))
+        self.text.setPlaceholderText(tr("placeholder", hotkey=self.hotkey.spec.label()))
+        self.credits.setText(tr("credits"))
+        self._update_mode_label()
+        self.tray.retranslate()
+        if not self.recorder.running and not self._processing:
+            self.set_status(tr("status.ready"))
+        else:
+            self.set_status(tr("status.listening"))
+
     def _toggle_window(self) -> None:
         if self.isVisible():
             self.hide()
@@ -501,7 +541,7 @@ class MainWindow(QWidget):
         self._update_mode_label()
         self.recognizer.preload(self._preload_for_mode())
         if self.current_mode() == MODE_EN and not ({"whisper", "whisper_base"} & models.available_engines()):
-            self.set_status("Для английского установите Whisper base в настройках", "#ffd27a")
+            self.set_status(tr("status.need_english"), "#ffd27a")
 
     def _preload_for_mode(self) -> list[str]:
         mode = self.current_mode()
@@ -516,8 +556,8 @@ class MainWindow(QWidget):
 
     def _update_mode_label(self) -> None:
         mode = self.current_mode()
-        self.engine_btn.setText(MODE_LABELS[mode])
-        self.engine_btn_compact.setText(MODE_LABELS[mode])
+        self.engine_btn.setText(tr(MODE_KEYS[mode]))
+        self.engine_btn_compact.setText(tr(MODE_KEYS[mode]))
 
     def _on_language(self, lang: str) -> None:
         self._last_lang = lang
@@ -530,7 +570,7 @@ class MainWindow(QWidget):
             self._set_recording_visual(False)
             self.tray.set_recording(False)
             if not self._processing and self._models_ready:
-                self.set_status("Готов")
+                self.set_status(tr("status.ready"))
             self._on_level(0.0)
             return
         self.recorder.start()
@@ -538,7 +578,7 @@ class MainWindow(QWidget):
             return
         self._set_recording_visual(True)
         self.tray.set_recording(True)
-        self.set_status("Слушаю…", "#c9d2ff")
+        self.set_status(tr("status.listening"), "#c9d2ff")
 
     def _set_recording_visual(self, recording: bool) -> None:
         for button, size in ((self.mic, 26), (self.mic_compact, 22)):
@@ -555,13 +595,13 @@ class MainWindow(QWidget):
         if not self.recorder.running:
             return
         if speaking:
-            self.set_status("Говорите…", "#8fb4ff")
+            self.set_status(tr("status.speaking"), "#8fb4ff")
         else:
-            self.set_status("Слушаю…", "#c9d2ff")
+            self.set_status(tr("status.listening"), "#c9d2ff")
 
     def _on_segment(self, audio) -> None:
         self._processing += 1
-        self.set_status("Распознаю…", "#ffd27a")
+        self.set_status(tr("status.recognizing"), "#ffd27a")
         self.recognizer.submit(audio, self.current_mode())
 
     # --- результаты -------------------------------------------------------------
@@ -570,11 +610,11 @@ class MainWindow(QWidget):
         self._processing = max(0, self._processing - 1)
         lang_suffix = f" · {self._last_lang.upper()}" if self._last_lang else ""
         if not self._models_ready:
-            self.set_status("Загружаю модель…", "#ffd27a")
+            self.set_status(tr("status.loading"), "#ffd27a")
         elif self.recorder.running:
-            self.set_status("Слушаю…", "#c9d2ff")
+            self.set_status(tr("status.listening"), "#c9d2ff")
         else:
-            self.set_status(f"Готов{lang_suffix}")
+            self.set_status(f"{tr('status.ready')}{lang_suffix}")
 
         _short, _lang, text, error, _elapsed = results[0]
         if error:
@@ -595,7 +635,7 @@ class MainWindow(QWidget):
     def _append_error(self, error: str) -> None:
         self.text.append(f"<div style='color:#ff8fa3;font-size:9pt'>{_escape(error)}</div>")
         self._scroll_bottom()
-        self.set_status("Ошибка распознавания", "#ff8fa3")
+        self.set_status(tr("status.error"), "#ff8fa3")
 
     def _scroll_bottom(self) -> None:
         QTimer.singleShot(0, self._do_scroll_bottom)
@@ -607,7 +647,7 @@ class MainWindow(QWidget):
     def _on_models_ready(self) -> None:
         self._models_ready = True
         if not self.recorder.running and not self._processing:
-            self.set_status("Готов")
+            self.set_status(tr("status.ready"))
 
     def _on_error(self, message: str) -> None:
         self.set_status(message, "#ff8fa3")
@@ -618,7 +658,7 @@ class MainWindow(QWidget):
     def _check_first_run(self) -> None:
         if models.available_engines():
             return
-        self.set_status("Выберите движок в настройках ⚙", "#ffd27a")
+        self.set_status(tr("status.choose_engine"), "#ffd27a")
         self._open_settings()
 
     def _open_settings(self) -> None:
@@ -630,14 +670,14 @@ class MainWindow(QWidget):
     def _apply_hotkey(self, spec: HotkeySpec) -> None:
         self.hotkey.set_spec(spec)
         self.settings.setValue("hotkey", spec.to_json())
-        self.text.setPlaceholderText(f"Нажмите ▶ или {spec.label()} и говорите…")
+        self.text.setPlaceholderText(tr("placeholder", hotkey=spec.label()))
         self.hotkey_hint.setText(spec.label())
 
     def _reload_engines(self) -> None:
         available = models.available_engines()
         self._models_ready = False
         if not available:
-            self.set_status("Нет движков — нажмите ⚙", "#ffd27a")
+            self.set_status(tr("status.no_engines"), "#ffd27a")
             return
         self.recognizer.preload(self._preload_for_mode())
 
@@ -654,12 +694,12 @@ class MainWindow(QWidget):
         text = self.text.toPlainText().strip()
         if text:
             QGuiApplication.clipboard().setText(text)
-            self.set_status("Скопировано")
+            self.set_status(tr("status.copied"))
 
     def _clear(self) -> None:
         self.text.clear()
         if not self.recorder.running:
-            self.set_status("Готов")
+            self.set_status(tr("status.ready"))
 
     @staticmethod
     def _repolish(widget) -> None:

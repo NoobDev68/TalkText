@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from . import models
 from .settings import app_settings
+from .i18n import tr
 from .autostart import is_enabled as autostart_enabled
 from .autostart import set_enabled as set_autostart
 from .hotkeys import (
@@ -107,7 +108,7 @@ class ModelsDialog(QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Настройки")
+        self.setWindowTitle(tr("dlg.title"))
         self.setModal(True)
         self.setMinimumWidth(620)
         self.setStyleSheet(DIALOG_STYLE)
@@ -134,16 +135,12 @@ class ModelsDialog(QDialog):
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(10)
 
-        title = QLabel("Настройки")
+        title = QLabel(tr("dlg.title"))
         title.setObjectName("dialogTitle")
         title.setStyleSheet("color: #e8eaed; font-size: 13pt; font-weight: 600;")
         layout.addWidget(title)
 
-        hint = QLabel(
-            "Сбер-движки лучше понимают русский и работают без видеокарты. "
-            "Whisper точнее на английском, но занимает ~4.7 ГБ и нужен GPU. "
-            "Скачиваются только отмеченные варианты."
-        )
+        hint = QLabel(tr("dlg.hint"))
         hint.setObjectName("dialogHint")
         hint.setStyleSheet("color: #8b93a7; font-size: 9pt;")
         hint.setWordWrap(True)
@@ -151,7 +148,7 @@ class ModelsDialog(QDialog):
 
         hotkey_row = QHBoxLayout()
         hotkey_row.setSpacing(8)
-        hotkey_title = QLabel("Горячая клавиша")
+        hotkey_title = QLabel(tr("dlg.hotkey"))
         hotkey_title.setStyleSheet("color: #9aa3b8; font-size: 9pt;")
         self.hotkey_btn = QPushButton(self._hotkey().label())
         self.hotkey_btn.setObjectName("secondary")
@@ -163,9 +160,9 @@ class ModelsDialog(QDialog):
         layout.addLayout(hotkey_row)
 
         autostart_row = QHBoxLayout()
-        autostart_title = QLabel("Автозапуск")
+        autostart_title = QLabel(tr("dlg.autostart"))
         autostart_title.setStyleSheet("color: #9aa3b8; font-size: 9pt;")
-        self.autostart_check = QCheckBox("Запускать при входе в Windows")
+        self.autostart_check = QCheckBox(tr("dlg.autostart.check"))
         self.autostart_check.setChecked(autostart_enabled())
         self.autostart_check.toggled.connect(self._on_autostart)
         autostart_row.addWidget(autostart_title)
@@ -202,18 +199,18 @@ class ModelsDialog(QDialog):
         layout.addWidget(self.progress_label)
 
         buttons = QHBoxLayout()
-        self.donate_btn = QPushButton("Отблагодарить автора")
+        self.donate_btn = QPushButton(tr("dlg.donate"))
         self.donate_btn.setObjectName("secondary")
-        self.donate_btn.setToolTip("Открыть страницу донатов в браузере")
+        self.donate_btn.setToolTip(tr("dlg.donate.tip"))
         self.donate_btn.clicked.connect(
             lambda: webbrowser.open("https://pay.cloudtips.ru/p/a87b504b")
         )
         buttons.addWidget(self.donate_btn)
         buttons.addStretch(1)
-        self.cancel_btn = QPushButton("Отмена")
+        self.cancel_btn = QPushButton(tr("dlg.cancel"))
         self.cancel_btn.setObjectName("secondary")
         self.cancel_btn.clicked.connect(self._on_cancel)
-        self.apply_btn = QPushButton("Применить")
+        self.apply_btn = QPushButton(tr("dlg.apply"))
         self.apply_btn.setObjectName("primary")
         self.apply_btn.clicked.connect(self._apply)
         buttons.addWidget(self.cancel_btn)
@@ -238,38 +235,42 @@ class ModelsDialog(QDialog):
         column = QVBoxLayout()
         column.setSpacing(2)
         heading = QHBoxLayout()
-        name = QLabel(spec.title)
+        name = QLabel(tr(f"model.{spec.key}.title"))
         name.setObjectName("modelTitle")
         heading.addWidget(name)
-        if spec.badge:
-            badge = QLabel(spec.badge)
+        badge_text = tr(f"model.{spec.key}.badge")
+        if badge_text != f"model.{spec.key}.badge":
+            badge = QLabel(badge_text)
             badge.setObjectName("modelStatusMissing")
             badge.setStyleSheet(
                 "color:#8fb4ff; background:rgba(91,124,250,0.15); border-radius:6px; padding:1px 7px;"
             )
             heading.addWidget(badge)
         if spec.recommended:
-            recommended = QLabel("Рекомендовано")
+            recommended = QLabel(tr("dlg.recommended"))
             recommended.setStyleSheet(
                 "color:#4fd1a5; background:rgba(79,209,165,0.14); border-radius:6px; padding:1px 7px;"
             )
             heading.addWidget(recommended)
         heading.addStretch(1)
-        delete_btn = QPushButton("Удалить")
+        delete_btn = QPushButton(tr("dlg.delete"))
         delete_btn.setStyleSheet(
             "color:#ff8fa3; background:rgba(255,92,122,0.10);"
             " border:1px solid rgba(255,92,122,0.35); border-radius:6px;"
             " padding:2px 9px; font-size:8pt;"
         )
         delete_btn.setCursor(Qt.PointingHandCursor)
-        delete_btn.setToolTip("Удалить движок с диска")
+        delete_btn.setToolTip(tr("dlg.delete.tip"))
         delete_btn.setVisible(models.installed(spec.key))
         delete_btn.clicked.connect(lambda _=False, key=spec.key: self._on_delete(key))
         self._delete_buttons[spec.key] = delete_btn
         heading.addWidget(delete_btn)
         column.addLayout(heading)
 
-        for bullet in spec.bullets:
+        for number in (1, 2, 3):
+            bullet = tr(f"model.{spec.key}.b{number}")
+            if bullet == f"model.{spec.key}.b{number}":
+                break
             label = QLabel("· " + bullet)
             label.setObjectName("modelBullet")
             label.setWordWrap(True)
@@ -288,11 +289,11 @@ class ModelsDialog(QDialog):
     def _update_status(self, spec: models.ModelSpec) -> None:
         label = self._status_labels[spec.key]
         if models.installed(spec.key):
-            label.setText(f"Установлена · {models.disk_usage_mb(spec.key)} МБ на диске")
+            label.setText(tr("dlg.installed", mb=models.disk_usage_mb(spec.key)))
             label.setObjectName("modelStatus")
             label.setStyleSheet("color: #4fd1a5; font-size: 8.5pt;")
         else:
-            label.setText(f"Не установлена · потребуется ~{spec.size_mb} МБ")
+            label.setText(tr("dlg.missing", mb=spec.size_mb))
             label.setStyleSheet("color: #8b93a7; font-size: 8.5pt;")
 
     # --- горячая клавиша ---------------------------------------------------------
@@ -303,7 +304,7 @@ class ModelsDialog(QDialog):
     def _start_capture(self) -> None:
         self._capturing = True
         self._ctrl_side = CTRL_NONE
-        self.hotkey_btn.setText("Нажмите комбинацию…")
+        self.hotkey_btn.setText(tr("dlg.capture"))
         self.hotkey_btn.setStyleSheet("border-color: #8fb4ff;")
         self.setFocus()
 
@@ -311,7 +312,9 @@ class ModelsDialog(QDialog):
         try:
             set_autostart(enabled)
         except OSError as exc:
-            QMessageBox.warning(self, "Автозапуск", f"Не удалось изменить автозапуск: {exc}")
+            QMessageBox.warning(
+                self, tr("dlg.autostart"), tr("dlg.autostart.error", error=exc)
+            )
             self.autostart_check.blockSignals(True)
             self.autostart_check.setChecked(not enabled)
             self.autostart_check.blockSignals(False)
@@ -367,11 +370,11 @@ class ModelsDialog(QDialog):
                 to_remove.append(key)
 
         if to_remove and not tasks:
-            names = ", ".join(models.MODELS[key].title for key in to_remove)
+            names = ", ".join(tr(f"model.{key}.title") for key in to_remove)
             answer = QMessageBox.question(
                 self,
-                "Удалить движки?",
-                f"Удалить с диска: {names}?\nЭто освободит место, докачать можно позже.",
+                tr("dlg.delete.title"),
+                tr("dlg.delete.question", title=names),
             )
             if answer != QMessageBox.Yes:
                 return
@@ -391,9 +394,14 @@ class ModelsDialog(QDialog):
     def on_progress(self, key: str, done: int, total: int) -> None:
         percent = int(done * 100 / total) if total else 0
         self.progress.setValue(min(percent, 100))
-        title = models.MODELS[key].title
         self.progress_label.setText(
-            f"{title}: {done / 1048576:.0f} из {total / 1048576:.0f} МБ ({percent}%)"
+            tr(
+                "dlg.downloading",
+                title=tr(f"model.{key}.title"),
+                done=f"{done / 1048576:.0f}",
+                total=f"{total / 1048576:.0f}",
+                pct=percent,
+            )
         )
 
     def _refresh_cards(self) -> None:
@@ -403,11 +411,10 @@ class ModelsDialog(QDialog):
             self._delete_buttons[spec.key].setVisible(models.installed(spec.key))
 
     def _on_delete(self, key: str) -> None:
-        spec = models.MODELS[key]
         answer = QMessageBox.question(
             self,
-            "Удалить движок?",
-            f"Удалить «{spec.title}» с диска?\nЕго можно будет скачать снова.",
+            tr("dlg.delete.title"),
+            tr("dlg.delete.question", title=tr(f"model.{key}.title")),
         )
         if answer != QMessageBox.Yes:
             return
@@ -421,7 +428,7 @@ class ModelsDialog(QDialog):
         self.progress_label.setText("")
         self._refresh_cards()
         if error:
-            QMessageBox.warning(self, "Ошибка загрузки", error)
+            QMessageBox.warning(self, tr("dlg.error.title"), error)
             return
         self.accept()
 
@@ -430,14 +437,12 @@ class ModelsDialog(QDialog):
         self._set_busy(False)
         self.progress.setVisible(False)
         self._refresh_cards()
-        self.progress_label.setText(
-            "Скачивание отменено. Уже загруженное сохранено — можно продолжить позже."
-        )
+        self.progress_label.setText(tr("dlg.cancelled"))
 
     def _set_busy(self, busy: bool) -> None:
         self.apply_btn.setEnabled(not busy)
         self.cancel_btn.setEnabled(True)
-        self.cancel_btn.setText("Отменить скачивание" if busy else "Отмена")
+        self.cancel_btn.setText(tr("dlg.cancel_download") if busy else tr("dlg.cancel"))
         for check in self._checks.values():
             check.setEnabled(not busy)
 
@@ -445,7 +450,7 @@ class ModelsDialog(QDialog):
         if self._worker is not None and self._worker.is_alive():
             if self._cancel is not None:
                 self._cancel.set()
-                self.cancel_btn.setText("Отменяю…")
+                self.cancel_btn.setText(tr("dlg.cancelling"))
                 self.cancel_btn.setEnabled(False)
             return
         self.reject()

@@ -39,9 +39,7 @@ class Cancelled(Exception):
 @dataclass(frozen=True)
 class ModelSpec:
     key: str
-    title: str
     size_mb: int
-    bullets: tuple[str, ...]
     kind: str  # "hf" | "cuda"
     repo: str = ""
     target: str = ""
@@ -49,14 +47,12 @@ class ModelSpec:
     marker: str = ""
     requires: tuple[str, ...] = ()
     shown: bool = True
-    badge: str = ""
     recommended: bool = False
 
 
 MODELS: dict[str, ModelSpec] = {
     "gigaam": ModelSpec(
         key="gigaam",
-        title="GigaAM v3 — русский",
         size_mb=216,
         kind="hf",
         repo="istupakov/gigaam-v3-onnx",
@@ -69,33 +65,19 @@ MODELS: dict[str, ModelSpec] = {
             "v3_e2e_rnnt_joint.int8.onnx",
         ),
         marker="v3_e2e_rnnt_encoder.int8.onnx",
-        bullets=(
-            "Лучшее качество на русском языке",
-            "Ставит пунктуацию и заглавные буквы",
-            "Работает на процессоре — видеокарта не нужна",
-        ),
-        badge="Русский",
         recommended=True,
     ),
     "gigaam_ml": ModelSpec(
         key="gigaam_ml",
-        title="GigaAM Multilingual — русский и английский",
         size_mb=214,
         kind="hf",
         repo="istupakov/gigaam-multilingual-ctc-onnx",
         target="gigaam-multilingual",
         files=("config.json", "multilingual_vocab.txt", "multilingual_ctc.int8.onnx"),
         marker="multilingual_ctc.int8.onnx",
-        bullets=(
-            "Распознаёт 5 языков: русский, английский, казахский, киргизский, узбекский",
-            "Не ставит пунктуацию и заглавные буквы",
-            "Для английского лучше Whisper base — Multilingual пишет его кириллицей",
-        ),
-        badge="RU + EN",
     ),
     "whisper_base": ModelSpec(
         key="whisper_base",
-        title="Whisper base — английский, лёгкий",
         size_mb=102,
         kind="hf",
         repo="istupakov/whisper-base-onnx",
@@ -107,16 +89,9 @@ MODELS: dict[str, ModelSpec] = {
             "added_tokens.json",
         ),
         marker="whisper-base_beamsearch.int8.onnx",
-        bullets=(
-            "Английский с пунктуацией и заглавными, без видеокарты",
-            "Всего ~100 МБ — замена GigaAM Multilingual для английского",
-            "Слабее Whisper large-v3, но и места занимает в 45 раз меньше",
-        ),
-        badge="Английский",
     ),
     "whisper": ModelSpec(
         key="whisper",
-        title="Whisper large-v3 — английский",
         size_mb=4728,
         kind="hf",
         repo="Systran/faster-whisper-large-v3",
@@ -131,21 +106,13 @@ MODELS: dict[str, ModelSpec] = {
         marker="model.bin",
         recommended=True,
         requires=("cuda",),
-        bullets=(
-            "Лучший английский: пунктуация, заглавные, имена",
-            "Очень надёжен на шуме и сложной лексике",
-            "Занимает ~4.7 ГБ и требует видеокарту NVIDIA",
-        ),
-        badge="Английский",
     ),
     "cuda": ModelSpec(
         key="cuda",
-        title="Библиотеки NVIDIA (для Whisper)",
         size_mb=1782,
         kind="cuda",
         marker="cublas64_12.dll",
         shown=False,
-        bullets=("cuBLAS и cuDNN — без них Whisper считает на процессоре",),
     ),
 }
 

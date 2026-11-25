@@ -1,7 +1,7 @@
 # TalkText
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Version 1.0.3](https://img.shields.io/badge/version-1.0.3-blue)
+![Version 1.0.4](https://img.shields.io/badge/version-1.0.4-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Portable](https://img.shields.io/badge/portable-no%20install-brightgreen)
 
@@ -13,7 +13,8 @@
 лежат рядом с программой в `settings.ini` и `models\`.
 
 [**Скачать**](https://github.com/NoobDev68/TalkText/releases/latest) ·
-[**Отблагодарить автора**](https://pay.cloudtips.ru/p/a87b504b)
+[**Отблагодарить автора**](https://pay.cloudtips.ru/p/a87b504b) ·
+[**Я на Boosty**](https://boosty.to/threer)
 
 ![Логотип TalkText](docs/banner.png)
 
@@ -35,8 +36,12 @@
   нижнем углу над часами.
 - **Выбор движков** — при первом запуске предлагается выбрать, что скачать:
   лёгкие движки Сбера (330 МБ) или точный Whisper large для видеокарт NVIDIA.
+- **Два языка интерфейса** — русский и английский, переключаются кнопкой
+  **RU/EN** в заголовке окна, без перезапуска программы.
 
 ![Полный режим](docs/screenshot.png)
+
+![Интерфейс на английском](docs/screenshot_en.png)
 
 ![Компактный режим](docs/screenshot_compact.png)
 
@@ -56,7 +61,7 @@
 **Контрольная сумма** (SHA256):
 
 ```
-b55ef569140964201320107800436598c91d2d9d7974019c996106115ecf42ee
+74460dd12b04736b788a05b62beb755ec47ea82bf12d47b3482a20812a94b525
 ```
 
 Проверка в PowerShell:
@@ -110,6 +115,8 @@ certutil -hashfile "TalkText.Portable.zip" SHA256
 
 Программа бесплатная и портативная, без рекламы и подписок. Если она помогла —
 можно отблагодарить автора: [**Отблагодарить автора**](https://pay.cloudtips.ru/p/a87b504b).
+
+[**Я на Boosty**](https://boosty.to/threer).
 
 В самой программе для этого есть кнопка **«Отблагодарить автора»** в окне настроек.
 

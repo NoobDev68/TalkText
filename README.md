@@ -1,7 +1,7 @@
 # TalkText
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Version 1.0.5](https://img.shields.io/badge/version-1.0.5-blue)
+![Version 1.0.6](https://img.shields.io/badge/version-1.0.6-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Portable](https://img.shields.io/badge/portable-no%20install-brightgreen)
 
@@ -47,7 +47,7 @@
 
 ## Скачать и запустить
 
-1. Скачать **TalkText.Portable.zip** из последнего релиза — 138 МБ.
+1. Скачать **TalkText.Portable.zip** из последнего релиза — 142 МБ.
 2. Распаковать архив в любую папку, кроме `Program Files`.
 3. Запустить `TalkText.exe`.
 4. При первом запуске выбрать движки — они скачаются с HuggingFace (от 330 МБ).
@@ -61,7 +61,7 @@
 **Контрольная сумма** (SHA256):
 
 ```
-04824f87c512ceb1934fff49d6ce50d884897f3a2bb95a350d06383b52d1e703
+e7324fed7646f318a28311f54d9238b4ee747f5c26233c04f5f8e160c3e53bb5
 ```
 
 Проверка в PowerShell:

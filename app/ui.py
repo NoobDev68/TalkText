@@ -676,6 +676,7 @@ class MainWindow(QWidget):
     def _reload_engines(self) -> None:
         available = models.available_engines()
         self._models_ready = False
+        self.engines.clear_errors()
         if not available:
             self.set_status(tr("status.no_engines"), "#ffd27a")
             return

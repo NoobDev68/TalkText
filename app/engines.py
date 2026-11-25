@@ -226,3 +226,7 @@ class Engines:
                 self.get(short)
             except Exception:  # noqa: BLE001
                 pass
+
+    def clear_errors(self) -> None:
+        """Забыть прежние неудачи: движок могли скачать в настройках."""
+        self._errors.clear()

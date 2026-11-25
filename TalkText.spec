@@ -8,6 +8,8 @@ datas = [
     ("resources/logo.png", "resources"),
     ("resources/check.png", "resources"),
     ("vendor/onnx_asr-0.12.0.dist-info", "onnx_asr-0.12.0.dist-info"),
+    # без этих файлов onnx-asr падает: fbanks.npz и ONNX-препроцессоры
+    ("vendor/onnx_asr/preprocessors/data", "onnx_asr/preprocessors/data"),
 ]
 binaries = []
 hiddenimports = ["onnx_asr"]

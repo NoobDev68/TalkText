@@ -119,6 +119,7 @@ class ModelsDialog(QDialog):
             self.resize(*self.DEFAULT_SIZE)
         self._checks: dict[str, QCheckBox] = {}
         self._status_labels: dict[str, QLabel] = {}
+        self._delete_buttons: dict[str, QPushButton] = {}
         self._cards: dict[str, QFrame] = {}
         self._worker: _Worker | None = None
         self._cancel: threading.Event | None = None
@@ -254,6 +255,18 @@ class ModelsDialog(QDialog):
             )
             heading.addWidget(recommended)
         heading.addStretch(1)
+        delete_btn = QPushButton("Удалить")
+        delete_btn.setStyleSheet(
+            "color:#ff8fa3; background:rgba(255,92,122,0.10);"
+            " border:1px solid rgba(255,92,122,0.35); border-radius:6px;"
+            " padding:2px 9px; font-size:8pt;"
+        )
+        delete_btn.setCursor(Qt.PointingHandCursor)
+        delete_btn.setToolTip("Удалить движок с диска")
+        delete_btn.setVisible(models.installed(spec.key))
+        delete_btn.clicked.connect(lambda _=False, key=spec.key: self._on_delete(key))
+        self._delete_buttons[spec.key] = delete_btn
+        heading.addWidget(delete_btn)
         column.addLayout(heading)
 
         for bullet in spec.bullets:
@@ -383,14 +396,30 @@ class ModelsDialog(QDialog):
             f"{title}: {done / 1048576:.0f} из {total / 1048576:.0f} МБ ({percent}%)"
         )
 
+    def _refresh_cards(self) -> None:
+        for spec in models.describe():
+            self._update_status(spec)
+            self._checks[spec.key].setChecked(models.installed(spec.key))
+            self._delete_buttons[spec.key].setVisible(models.installed(spec.key))
+
+    def _on_delete(self, key: str) -> None:
+        spec = models.MODELS[key]
+        answer = QMessageBox.question(
+            self,
+            "Удалить движок?",
+            f"Удалить «{spec.title}» с диска?\nЕго можно будет скачать снова.",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        models.uninstall(key)
+        self._refresh_cards()
+
     def _on_worker_done(self, error: str) -> None:
         self._cancel = None
         self._set_busy(False)
         self.progress.setVisible(False)
         self.progress_label.setText("")
-        for spec in models.describe():
-            self._update_status(spec)
-            self._checks[spec.key].setChecked(models.installed(spec.key))
+        self._refresh_cards()
         if error:
             QMessageBox.warning(self, "Ошибка загрузки", error)
             return
@@ -400,9 +429,7 @@ class ModelsDialog(QDialog):
         self._cancel = None
         self._set_busy(False)
         self.progress.setVisible(False)
-        for spec in models.describe():
-            self._update_status(spec)
-            self._checks[spec.key].setChecked(models.installed(spec.key))
+        self._refresh_cards()
         self.progress_label.setText(
             "Скачивание отменено. Уже загруженное сохранено — можно продолжить позже."
         )

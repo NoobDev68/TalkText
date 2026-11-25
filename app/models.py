@@ -313,6 +313,10 @@ def install(key: str, progress, cancel=None) -> None:
     else:
         _install_hf(spec, progress, cancel)
 
+    # large делает лёгкий Whisper base ненужным — освобождаем место автоматически.
+    if key == "whisper" and installed("whisper") and installed("whisper_base"):
+        uninstall("whisper_base")
+
 
 def uninstall(key: str) -> None:
     spec = MODELS[key]

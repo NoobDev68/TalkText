@@ -1,0 +1,23 @@
+# Движки и библиотеки NVIDIA — большие, не в репозитории
+models/
+vendor/nvidia/
+vendor/nvidia_*dist-info/
+vendor/*.whl
+*.whl
+*.part
+
+# Сборка и временные файлы
+build/
+dist/
+__pycache__/
+*.pyc
+.tmp/
+.dsh-cost/
+settings.ini
+TalkTextDebug.spec
+
+# Исходные изображения (готовые иконки лежат в resources/)
+Gemini_*.jpeg
+
+# Архивы релизов
+*.zip

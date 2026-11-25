@@ -1,0 +1,324 @@
+"""Реестр движков-моделей: что можно скачать, проверка установки, загрузка.
+
+Модели качаются с HuggingFace, CUDA-библиотеки — с PyPI (нужны только Whisper).
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import ssl
+import time
+import urllib.request
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+
+import certifi
+
+from . import paths
+
+ROOT = paths.APP_DIR
+MODELS_DIR = paths.MODELS_DIR
+VENDOR = paths.VENDOR_DIR
+
+_CTX = ssl.create_default_context(cafile=certifi.where())
+
+# Wheel-ы NVIDIA для GPU-режима Whisper: имя пакета -> версия.
+_CUDA_PACKAGES = {
+    "nvidia-cublas-cu12": "12.9.2.10",
+    "nvidia-cudnn-cu12": "9.28.1.4",
+    "nvidia-cuda-runtime-cu12": "12.9.79",
+}
+
+
+class Cancelled(Exception):
+    """Скачивание прервано пользователем."""
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    key: str
+    title: str
+    size_mb: int
+    bullets: tuple[str, ...]
+    kind: str  # "hf" | "cuda"
+    repo: str = ""
+    target: str = ""
+    files: tuple[str, ...] = ()
+    marker: str = ""
+    requires: tuple[str, ...] = ()
+    shown: bool = True
+    badge: str = ""
+
+
+MODELS: dict[str, ModelSpec] = {
+    "gigaam": ModelSpec(
+        key="gigaam",
+        title="GigaAM v3 — русский",
+        size_mb=216,
+        kind="hf",
+        repo="istupakov/gigaam-v3-onnx",
+        target="gigaam-v3",
+        files=(
+            "config.json",
+            "v3_e2e_rnnt_vocab.txt",
+            "v3_e2e_rnnt_encoder.int8.onnx",
+            "v3_e2e_rnnt_decoder.int8.onnx",
+            "v3_e2e_rnnt_joint.int8.onnx",
+        ),
+        marker="v3_e2e_rnnt_encoder.int8.onnx",
+        bullets=(
+            "Лучшее качество на русском языке",
+            "Ставит пунктуацию и заглавные буквы",
+            "Работает на процессоре — видеокарта не нужна",
+        ),
+        badge="Русский",
+    ),
+    "gigaam_ml": ModelSpec(
+        key="gigaam_ml",
+        title="GigaAM Multilingual — русский и английский",
+        size_mb=214,
+        kind="hf",
+        repo="istupakov/gigaam-multilingual-ctc-onnx",
+        target="gigaam-multilingual",
+        files=("config.json", "multilingual_vocab.txt", "multilingual_ctc.int8.onnx"),
+        marker="multilingual_ctc.int8.onnx",
+        bullets=(
+            "Распознаёт 5 языков: русский, английский, казахский, киргизский, узбекский",
+            "Не ставит пунктуацию и заглавные буквы",
+            "Для английского лучше Whisper base — Multilingual пишет его кириллицей",
+        ),
+        badge="RU + EN",
+    ),
+    "whisper_base": ModelSpec(
+        key="whisper_base",
+        title="Whisper base — английский, лёгкий",
+        size_mb=102,
+        kind="hf",
+        repo="istupakov/whisper-base-onnx",
+        target="whisper-base",
+        files=(
+            "config.json",
+            "whisper-base_beamsearch.int8.onnx",
+            "vocab.json",
+            "added_tokens.json",
+        ),
+        marker="whisper-base_beamsearch.int8.onnx",
+        bullets=(
+            "Английский с пунктуацией и заглавными, без видеокарты",
+            "Всего ~100 МБ — замена GigaAM Multilingual для английского",
+            "Слабее Whisper large-v3, но и места занимает в 45 раз меньше",
+        ),
+        badge="Английский",
+    ),
+    "whisper": ModelSpec(
+        key="whisper",
+        title="Whisper large-v3 — английский",
+        size_mb=4728,
+        kind="hf",
+        repo="Systran/faster-whisper-large-v3",
+        target="whisper-large-v3",
+        files=(
+            "config.json",
+            "model.bin",
+            "preprocessor_config.json",
+            "tokenizer.json",
+            "vocabulary.json",
+        ),
+        marker="model.bin",
+        requires=("cuda",),
+        bullets=(
+            "Лучший английский: пунктуация, заглавные, имена",
+            "Очень надёжен на шуме и сложной лексике",
+            "Занимает ~4.7 ГБ и требует видеокарту NVIDIA",
+        ),
+        badge="Английский",
+    ),
+    "cuda": ModelSpec(
+        key="cuda",
+        title="Библиотеки NVIDIA (для Whisper)",
+        size_mb=1782,
+        kind="cuda",
+        marker="cublas64_12.dll",
+        shown=False,
+        bullets=("cuBLAS и cuDNN — без них Whisper считает на процессоре",),
+    ),
+}
+
+
+def _files_dir(spec: ModelSpec) -> Path:
+    if spec.kind == "cuda":
+        return VENDOR / "nvidia"
+    return MODELS_DIR / spec.target
+
+
+def installed(key: str) -> bool:
+    spec = MODELS[key]
+    if spec.kind == "cuda":
+        return (VENDOR / "nvidia" / "cublas" / "bin" / spec.marker).is_file()
+    return (_files_dir(spec) / spec.marker).is_file()
+
+
+def installed_keys() -> set[str]:
+    return {key for key in MODELS if installed(key)}
+
+
+def available_engines() -> set[str]:
+    """Ключи движков, готовых к работе (cuda сама по себе движком не является)."""
+    keys = installed_keys()
+    return {k for k in keys if k in ("gigaam", "gigaam_ml", "whisper", "whisper_base")}
+
+
+def disk_usage_mb(key: str) -> int:
+    path = _files_dir(MODELS[key])
+    if not path.exists():
+        return 0
+    total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+    return int(total / 1048576)
+
+
+# --- скачивание ---------------------------------------------------------------
+
+
+def _download(url: str, dest: Path, on_bytes, cancel=None) -> None:
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    start = tmp.stat().st_size if tmp.exists() else 0
+    req = urllib.request.Request(url, headers={"Range": f"bytes={start}-"} if start else {})
+    with urllib.request.urlopen(req, timeout=120, context=_CTX) as resp:
+        total = start + int(resp.headers.get("Content-Length") or 0)
+        mode = "ab" if start and resp.status == 206 else "wb"
+        if mode == "wb":
+            start = 0
+        done = start
+        last = 0.0
+        with open(tmp, mode) as f:
+            while chunk := resp.read(1 << 20):
+                if cancel is not None and cancel.is_set():
+                    raise Cancelled("скачивание отменено")
+                f.write(chunk)
+                done += len(chunk)
+                now = time.time()
+                if now - last > 0.4:
+                    last = now
+                    on_bytes(done, total)
+    if total and done != total:
+        raise RuntimeError(f"соединение оборвалось: получено {done} из {total} байт")
+    tmp.replace(dest)
+
+
+def _install_hf(spec: ModelSpec, progress, cancel=None) -> None:
+    target = _files_dir(spec)
+    target.mkdir(parents=True, exist_ok=True)
+    known = {f["name"]: f["size"] for f in _hf_sizes(spec.repo) if f["name"] in spec.files}
+    total = sum(known.values()) or 1
+    done_before = sum(
+        (target / name).stat().st_size for name in spec.files if (target / name).is_file()
+    )
+    done_before = min(done_before, total)
+    for name in spec.files:
+        if cancel is not None and cancel.is_set():
+            raise Cancelled("скачивание отменено")
+        dest = target / name
+        if dest.is_file():
+            continue
+        progress(spec.key, done_before, total)
+
+        def on_bytes(done: int, _file_total: int, base=done_before) -> None:
+            progress(spec.key, base + done, total)
+
+        _download(f"https://huggingface.co/{spec.repo}/resolve/main/{name}", dest, on_bytes, cancel)
+        done_before += dest.stat().st_size
+
+
+def _hf_sizes(repo: str) -> list[dict]:
+    import json
+
+    url = f"https://huggingface.co/api/models/{repo}?blobs=true"
+    with urllib.request.urlopen(url, timeout=30, context=_CTX) as r:
+        data = json.load(r)
+    return [
+        {"name": s["rfilename"], "size": s.get("size") or 0}
+        for s in data.get("siblings", [])
+        if s.get("size")
+    ]
+
+
+def _cuda_wheel_url(package: str, version: str) -> tuple[str, int]:
+    import json
+
+    url = f"https://pypi.org/pypi/{package}/{version}/json"
+    with urllib.request.urlopen(url, timeout=60, context=_CTX) as r:
+        data = json.load(r)
+    for file in data["urls"]:
+        if "win_amd64" in file["filename"]:
+            return file["url"], file["size"]
+    raise RuntimeError(f"нет Windows-сборки {package} {version}")
+
+
+def _install_cuda(spec: ModelSpec, progress, cancel=None) -> None:
+    wheels: list[tuple[str, str, int]] = []
+    for package, version in _CUDA_PACKAGES.items():
+        url, size = _cuda_wheel_url(package, version)
+        wheels.append((package, url, size))
+    total = sum(size for _, _, size in wheels)
+    done_total = 0
+    VENDOR.mkdir(parents=True, exist_ok=True)
+    for package, url, size in wheels:
+        if cancel is not None and cancel.is_set():
+            raise Cancelled("скачивание отменено")
+        wheel = MODELS_DIR / f"{package}-{_CUDA_PACKAGES[package]}-win_amd64.whl"
+        if not wheel.is_file():
+            base = done_total
+
+            def on_bytes(done: int, _total: int, base=base) -> None:
+                progress(spec.key, base + done, total)
+
+            _download(url, wheel, on_bytes, cancel)
+        if not zipfile.is_zipfile(wheel):
+            # Недокачанный или повреждённый файл — начинаем заново.
+            wheel.unlink(missing_ok=True)
+            base = done_total
+
+            def on_retry(done: int, _total: int, base=base) -> None:
+                progress(spec.key, base + done, total)
+
+            _download(url, wheel, on_retry, cancel)
+        with zipfile.ZipFile(wheel) as z:
+            z.extractall(VENDOR)
+        done_total += size
+    for wheel in MODELS_DIR.glob("nvidia-*.whl"):
+        wheel.unlink(missing_ok=True)
+
+
+def install(key: str, progress, cancel=None) -> None:
+    """Скачивает модель (и её зависимости). progress(key, done_bytes, total_bytes).
+
+    cancel — threading.Event: если установлен, скачивание прерывается исключением
+    Cancelled, а недокачанные файлы остаются в *.part для продолжения позже.
+    """
+    spec = MODELS[key]
+    if cancel is not None and cancel.is_set():
+        raise Cancelled("скачивание отменено")
+    for req in spec.requires:
+        if not installed(req):
+            install(req, progress, cancel)
+    if installed(key):
+        return
+    if spec.kind == "cuda":
+        _install_cuda(spec, progress, cancel)
+    else:
+        _install_hf(spec, progress, cancel)
+
+
+def uninstall(key: str) -> None:
+    spec = MODELS[key]
+    if key == "whisper":
+        uninstall("cuda")
+    shutil.rmtree(_files_dir(spec), ignore_errors=True)
+
+
+def describe() -> list[ModelSpec]:
+    # Порядок карточек в настройках.
+    order = ["gigaam", "whisper", "whisper_base", "gigaam_ml"]
+    return [MODELS[key] for key in order if MODELS[key].shown]

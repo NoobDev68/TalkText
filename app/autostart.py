@@ -6,6 +6,8 @@ import sys
 import winreg
 from pathlib import Path
 
+from .paths import FROZEN
+
 ROOT = Path(__file__).resolve().parent.parent
 MAIN = ROOT / "main.py"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -20,6 +22,8 @@ def _pythonw() -> Path:
 
 
 def command() -> str:
+    if FROZEN:
+        return f'"{Path(sys.executable).resolve()}"'
     return f'"{_pythonw()}" "{MAIN}"'
 
 

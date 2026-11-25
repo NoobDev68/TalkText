@@ -48,6 +48,23 @@ def rounded_icon(image: Image.Image, size: int) -> Image.Image:
     return result
 
 
+def bright_bbox(image: Image.Image, threshold: float = 110) -> tuple[int, int, int, int]:
+    """Границы яркого содержимого (логотип на тёмном фоне)."""
+    rgb = image.convert("RGB")
+    width, height = rgb.size
+    px = rgb.load()
+    left, top, right, bottom = width, height, 0, 0
+    for y in range(height):
+        for x in range(width):
+            r, g, b = px[x, y]
+            if 0.299 * r + 0.587 * g + 0.114 * b > threshold:
+                left = min(left, x)
+                right = max(right, x)
+                top = min(top, y)
+                bottom = max(bottom, y)
+    return left, top, right + 1, bottom + 1
+
+
 def main() -> None:
     icon = Image.open(ICON_SRC)
     box = content_bbox(icon)
@@ -61,11 +78,21 @@ def main() -> None:
     sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
     big.save(RES / "icon.ico", sizes=sizes)
 
-    banner = Image.open(BANNER_SRC)
-    banner = banner.convert("RGB")
+    banner = Image.open(BANNER_SRC).convert("RGB")
     banner.resize((1200, 670), Image.LANCZOS).save(DOCS / "banner.png")
-    print("готово: icon.png, logo.png, icon.ico, docs/banner.png")
-    print("размер логотипа:", big.size)
+
+    # Горизонтальный логотип «TT + TextTalk» для заголовка окна.
+    mark = bright_bbox(banner)
+    print("bbox логотипа:", mark)
+    wordmark = banner.crop(mark)
+    wordmark.resize((wordmark.width * 96 // wordmark.height, 96), Image.LANCZOS).save(
+        RES / "logo_wordmark.png"
+    )
+    print("готово: icon.png, logo.png, icon.ico, logo_wordmark.png, docs/banner.png")
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":

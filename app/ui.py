@@ -37,7 +37,7 @@ MODE_LABELS = {
 }
 
 COMPACT_SIZE = (216, 252)
-FULL_SIZE = (480, 340)
+FULL_SIZE = (561, 364)
 MIN_FULL_SIZE = (420, 300)
 
 STYLES = """
@@ -224,13 +224,12 @@ class MainWindow(QWidget):
         header = QHBoxLayout()
         header.setSpacing(6)
         logo = QLabel()
-        logo_pixmap = QPixmap(str(paths.resource("logo.png")))
+        logo_pixmap = QPixmap(str(paths.resource("logo_wordmark.png")))
         if not logo_pixmap.isNull():
-            logo.setPixmap(logo_pixmap.scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logo.setPixmap(
+                logo_pixmap.scaledToHeight(26, Qt.SmoothTransformation)
+            )
         header.addWidget(logo)
-        title = QLabel("TalkText")
-        title.setObjectName("title")
-        header.addWidget(title)
         header.addStretch(1)
         self.settings_btn = QPushButton()
         self.settings_btn.setObjectName("tool")
@@ -305,7 +304,7 @@ class MainWindow(QWidget):
         layout.addLayout(footer)
 
         credits = QLabel("Создатели: ThreeR и DeepSeek")
-        credits.setStyleSheet("color: #5c6373; font-size: 7.5pt;")
+        credits.setStyleSheet("color: #8b93a7; font-size: 9.5pt;")
         credits.setAlignment(Qt.AlignCenter)
         layout.addWidget(credits)
 
@@ -410,7 +409,7 @@ class MainWindow(QWidget):
         self.recognizer.language.connect(self._on_language)
 
     def _restore_state(self) -> None:
-        self.insert_check.setChecked(self.settings.value("insert", True, type=bool))
+        self.insert_check.setChecked(self.settings.value("insert", False, type=bool))
         self._apply_compact(self._compact, save=False)
         # Стартуем в правом нижнем углу рабочей области — над часами, не закрывая панель задач.
         # Вокруг окна есть прозрачная тень (24 px), поэтому окно сдвигаем на её ширину:
@@ -766,6 +765,7 @@ class MainWindow(QWidget):
             self._resize_edges_set = set()
             if not self._compact:
                 self._full_size = self.size()
+                self.settings.setValue("size", self._full_size)
             self.unsetCursor()
         self._drag_pos = None
         super().mouseReleaseEvent(event)

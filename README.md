@@ -1,7 +1,7 @@
 # TalkText
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Version 1.0.4](https://img.shields.io/badge/version-1.0.4-blue)
+![Version 1.0.5](https://img.shields.io/badge/version-1.0.5-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Portable](https://img.shields.io/badge/portable-no%20install-brightgreen)
 
@@ -61,7 +61,7 @@
 **Контрольная сумма** (SHA256):
 
 ```
-74460dd12b04736b788a05b62beb755ec47ea82bf12d47b3482a20812a94b525
+04824f87c512ceb1934fff49d6ce50d884897f3a2bb95a350d06383b52d1e703
 ```
 
 Проверка в PowerShell:

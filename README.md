@@ -1,7 +1,7 @@
 # TalkText
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Version 1.0.6](https://img.shields.io/badge/version-1.0.6-blue)
+![Version 1.0.7](https://img.shields.io/badge/version-1.0.7-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Portable](https://img.shields.io/badge/portable-no%20install-brightgreen)
 
@@ -61,7 +61,7 @@
 **Контрольная сумма** (SHA256):
 
 ```
-e7324fed7646f318a28311f54d9238b4ee747f5c26233c04f5f8e160c3e53bb5
+a97579dad6d20558552c58007e0fcae04556d1cd05df46b24381069f56fd2ea7
 ```
 
 Проверка в PowerShell:
@@ -135,3 +135,6 @@ python -m PyInstaller --noconfirm TalkText.spec
 ## Лицензия
 
 MIT — см. [LICENSE](LICENSE). Создатели: ThreeR и DeepSeek.
+
+Лицензии сторонних компонентов и движков — в файле
+[THIRD_PARTY.md](THIRD_PARTY.md); он же лежит рядом с `TalkText.exe` в архиве.

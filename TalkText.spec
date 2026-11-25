@@ -1,6 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 """Сборка портативного TalkText: exe + _internal, модели ставятся рядом отдельно."""
 
+import shutil
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_all
 
 datas = [
@@ -75,3 +78,8 @@ coll = COLLECT(
     upx=False,
     name="TalkText",
 )
+
+# Лицензия и список сторонних компонентов — рядом с exe: MIT требует сохранять
+# уведомление об авторстве в копиях программы.
+for _name in ("LICENSE", "THIRD_PARTY.md"):
+    shutil.copyfile(Path(SPECPATH) / _name, Path(DISTPATH) / "TalkText" / _name)

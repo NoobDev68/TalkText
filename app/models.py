@@ -50,6 +50,7 @@ class ModelSpec:
     requires: tuple[str, ...] = ()
     shown: bool = True
     badge: str = ""
+    recommended: bool = False
 
 
 MODELS: dict[str, ModelSpec] = {
@@ -74,6 +75,7 @@ MODELS: dict[str, ModelSpec] = {
             "Работает на процессоре — видеокарта не нужна",
         ),
         badge="Русский",
+        recommended=True,
     ),
     "gigaam_ml": ModelSpec(
         key="gigaam_ml",
@@ -127,6 +129,7 @@ MODELS: dict[str, ModelSpec] = {
             "vocabulary.json",
         ),
         marker="model.bin",
+        recommended=True,
         requires=("cuda",),
         bullets=(
             "Лучший английский: пунктуация, заглавные, имена",

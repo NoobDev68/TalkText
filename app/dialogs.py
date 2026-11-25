@@ -247,6 +247,12 @@ class ModelsDialog(QDialog):
                 "color:#8fb4ff; background:rgba(91,124,250,0.15); border-radius:6px; padding:1px 7px;"
             )
             heading.addWidget(badge)
+        if spec.recommended:
+            recommended = QLabel("Рекомендовано")
+            recommended.setStyleSheet(
+                "color:#4fd1a5; background:rgba(79,209,165,0.14); border-radius:6px; padding:1px 7px;"
+            )
+            heading.addWidget(recommended)
         heading.addStretch(1)
         column.addLayout(heading)
 

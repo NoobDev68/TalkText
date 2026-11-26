@@ -43,8 +43,10 @@ MODE_KEYS = {
 ENGINE_ORDER = ["gigaam", "whisper_ru", "whisper_turbo", "whisper_small", "whisper_base", "gigaam_ml"]
 
 COMPACT_SIZE = (216, 252)
-FULL_SIZE = (592, 408)  # размер по умолчанию для чистой установки
-MIN_FULL_SIZE = (420, 300)
+# Подобрано по фактическим подписям: «Авто · Multilingual» и «Авто · Podlodka»
+# влезают целиком, ничего не обрезается. Меньше окно сделать нельзя.
+FULL_SIZE = (650, 410)
+MIN_FULL_SIZE = FULL_SIZE
 
 # Вокруг окна прозрачная тень: карточка меньше окна на эту величину с каждой стороны.
 SHADOW = 24
@@ -487,9 +489,9 @@ class MainWindow(QWidget):
             self.setMaximumSize(COMPACT_SIZE[0], COMPACT_SIZE[1])
             self.resize(*COMPACT_SIZE)
         else:
-            self.setMinimumSize(*MIN_FULL_SIZE)
+            self.setMinimumSize(*FULL_SIZE)
             self.setMaximumSize(16777215, 16777215)
-            self.resize(self._full_size)
+            self.resize(self._full_size.expandedTo(QSize(*FULL_SIZE)))
         self.move(before.right() - self.width() + 1, before.bottom() - self.height() + 1)
         self._clamp_to_screen()
         if save:
@@ -674,14 +676,19 @@ class MainWindow(QWidget):
         self.lang_btn.setText(tr(MODE_KEYS[self.current_mode()]))
         self.lang_btn.setToolTip(tr("btn.lang.tip"))
         if self._engine_key:
-            engine_text = tr(f"engine.{self._engine_key}")
+            # На кнопке — короткое имя, полное — в подсказке: длинные названия
+            # вроде «Whisper turbo RU (Podlodka)» обрезались в подвале.
+            engine_text = tr(f"engine.{self._engine_key}.short")
         elif self._last_engine:
             # В «Авто» показываем, кого выбрала маршрутизация в прошлый раз.
             engine_text = f"{tr('engine.auto.short')} · {tr(f'engine.{self._last_engine}.short')}"
         else:
             engine_text = tr("engine.auto.short")
         self.engine_btn.setText(engine_text)
-        self.engine_btn.setToolTip(tr("btn.engine.tip"))
+        tip = tr("btn.engine.tip")
+        if self._engine_key:
+            tip = f"{tr(f'engine.{self._engine_key}')} · {tip}"
+        self.engine_btn.setToolTip(tip)
 
         # Компактное окно: одна кнопка, на ней язык, движок — в подсказке и меню.
         self.engine_btn_compact.setText(tr(MODE_KEYS[self.current_mode()]))

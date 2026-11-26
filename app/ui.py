@@ -418,7 +418,7 @@ class MainWindow(QWidget):
         self.recognizer.language.connect(self._on_language)
 
     def _restore_state(self) -> None:
-        self.insert_check.setChecked(self.settings.value("insert", False, type=bool))
+        self.insert_check.setChecked(self.settings.value("insert", True, type=bool))
         self._apply_compact(self._compact, save=False)
         # Стартуем в правом нижнем углу рабочей области — над часами, не закрывая панель задач.
         # Вокруг окна есть прозрачная тень (24 px), поэтому окно сдвигаем на её ширину:

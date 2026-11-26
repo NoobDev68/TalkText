@@ -137,7 +137,7 @@ class ModelsDialog(QDialog):
         title.setStyleSheet("color: #e8eaed; font-size: 13pt; font-weight: 600;")
         layout.addWidget(title)
 
-        hint = QLabel(tr("dlg.hint") + "\n" + tr("dlg.hint.extra"))
+        hint = QLabel(tr("dlg.hint"))
         hint.setObjectName("dialogHint")
         hint.setStyleSheet("color: #8b93a7; font-size: 9pt;")
         hint.setWordWrap(True)

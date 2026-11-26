@@ -178,20 +178,11 @@ _STRINGS: dict[str, tuple[str, str]] = {
     "dlg.error.title": ("Ошибка загрузки", "Download error"),
     "dlg.capture": ("Нажмите комбинацию…", "Press a combination…"),
     "dlg.hint": (
-        "Русский: GigaAM v3 — на процессоре и устойчив к шуму; Podlodka — точнее в тишине, "
-        "но нужна видеокарта. Английский: turbo — лучший и требует видеокарту; small и base "
-        "работают на процессоре (small точнее, base быстрее). Кнопка «Рекомендовано» подберёт "
-        "набор под этот компьютер.",
-        "Russian: GigaAM v3 runs on the CPU and handles noise; Podlodka is more accurate in a "
-        "quiet room but needs a GPU. English: turbo is the best and needs a GPU; small and base "
-        "run on the CPU (small is more accurate, base is faster). The “Recommended” button picks "
-        "a set for this PC.",
-    ),
-    "dlg.hint.extra": (
-        "Галочка значит «использовать движок»: снятая галочка ничего не удаляет, "
-        "движок просто пропадает из выбора в окне. Удаление — кнопкой «Удалить».",
-        "The checkbox means “use this engine”: unchecking removes nothing, the engine "
-        "just disappears from the window's picker. Use the Delete button to remove files.",
+        "Кликните кнопку «Рекомендовано», чтобы автоматически выбрать движок распознавания "
+        "под характеристики Вашего ПК. Либо выберите движки вручную. Кнопка «Применить» "
+        "запустит скачивание.",
+        "Click “Recommended” to pick the recognition engine for your PC automatically. "
+        "Or choose engines manually. The “Apply” button starts the download.",
     ),
     "dlg.autostart.error": (
         "Не удалось изменить автозапуск: {error}",

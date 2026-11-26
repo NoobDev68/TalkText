@@ -36,6 +36,10 @@ class Cancelled(Exception):
     """Скачивание прервано пользователем."""
 
 
+# Движки, которым нужны CUDA-библиотеки (общий пакет vendor/nvidia).
+_GPU_KEYS = ("whisper", "whisper_turbo")
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     key: str
@@ -47,7 +51,6 @@ class ModelSpec:
     marker: str = ""
     requires: tuple[str, ...] = ()
     shown: bool = True
-    recommended: bool = False
 
 
 MODELS: dict[str, ModelSpec] = {
@@ -65,7 +68,6 @@ MODELS: dict[str, ModelSpec] = {
             "v3_e2e_rnnt_joint.int8.onnx",
         ),
         marker="v3_e2e_rnnt_encoder.int8.onnx",
-        recommended=True,
     ),
     "gigaam_ml": ModelSpec(
         key="gigaam_ml",
@@ -75,6 +77,36 @@ MODELS: dict[str, ModelSpec] = {
         target="gigaam-multilingual",
         files=("config.json", "multilingual_vocab.txt", "multilingual_ctc.int8.onnx"),
         marker="multilingual_ctc.int8.onnx",
+    ),
+    "whisper_ru": ModelSpec(
+        key="whisper_ru",
+        size_mb=1543,
+        kind="hf",
+        repo="bond005/whisper-podlodka-turbo-ct2",
+        target="whisper-podlodka-turbo",
+        files=(
+            "config.json",
+            "model.bin",
+            "preprocessor_config.json",
+            "tokenizer.json",
+            "vocabulary.json",
+        ),
+        marker="model.bin",
+        requires=("cuda",),
+    ),
+    "whisper_small": ModelSpec(
+        key="whisper_small",
+        size_mb=463,
+        kind="hf",
+        repo="Systran/faster-whisper-small",
+        target="whisper-small",
+        files=(
+            "config.json",
+            "model.bin",
+            "tokenizer.json",
+            "vocabulary.txt",
+        ),
+        marker="model.bin",
     ),
     "whisper_base": ModelSpec(
         key="whisper_base",
@@ -90,6 +122,8 @@ MODELS: dict[str, ModelSpec] = {
         ),
         marker="whisper-base_beamsearch.int8.onnx",
     ),
+    # Whisper large-v3 больше не предлагается: turbo даёт то же качество и вдвое
+    # быстрее. Спека осталась, чтобы корректно работать с уже скачанными копиями.
     "whisper": ModelSpec(
         key="whisper",
         size_mb=4728,
@@ -104,7 +138,23 @@ MODELS: dict[str, ModelSpec] = {
             "vocabulary.json",
         ),
         marker="model.bin",
-        recommended=True,
+        requires=("cuda",),
+        shown=False,
+    ),
+    "whisper_turbo": ModelSpec(
+        key="whisper_turbo",
+        size_mb=1543,
+        kind="hf",
+        repo="deepdml/faster-whisper-large-v3-turbo-ct2",
+        target="whisper-large-v3-turbo",
+        files=(
+            "config.json",
+            "model.bin",
+            "preprocessor_config.json",
+            "tokenizer.json",
+            "vocabulary.json",
+        ),
+        marker="model.bin",
         requires=("cuda",),
     ),
     "cuda": ModelSpec(
@@ -134,10 +184,39 @@ def installed_keys() -> set[str]:
     return {key for key in MODELS if installed(key)}
 
 
+# Движки, которые вообще бывают в работе (cuda сама по себе движком не является).
+# Whisper large-v3 снят с поддержки: его место занял turbo с тем же качеством.
+ENGINE_KEYS = ("gigaam", "gigaam_ml", "whisper_ru", "whisper_turbo", "whisper_small", "whisper_base")
+
+
+def enabled_keys() -> set[str]:
+    """Движки, выбранные галочками в настройках.
+
+    Снятая галочка движок не удаляет — он просто перестаёт предлагаться в окне.
+    Удаление — только кнопкой «Удалить». Если настройки ещё нет, включено всё
+    скачанное (поведение старых версий).
+    """
+    from .settings import app_settings
+
+    raw = app_settings().value("enabled")
+    if raw is None:
+        # Настройки старого формата: считаем включённым всё скачанное.
+        return installed_keys()
+    # Пустая строка — пользователь снял все галочки, это осознанный выбор.
+    return {key for key in str(raw).split(",") if key in MODELS}
+
+
+def set_enabled_keys(keys: set[str]) -> None:
+    from .settings import app_settings
+
+    settings = app_settings()
+    settings.setValue("enabled", ",".join(sorted(keys)))
+    settings.sync()
+
+
 def available_engines() -> set[str]:
-    """Ключи движков, готовых к работе (cuda сама по себе движком не является)."""
-    keys = installed_keys()
-    return {k for k in keys if k in ("gigaam", "gigaam_ml", "whisper", "whisper_base")}
+    """Движки, которые можно использовать: скачаны и включены галочкой."""
+    return {key for key in installed_keys() & enabled_keys() if key in ENGINE_KEYS}
 
 
 def disk_usage_mb(key: str) -> int:
@@ -280,19 +359,31 @@ def install(key: str, progress, cancel=None) -> None:
     else:
         _install_hf(spec, progress, cancel)
 
-    # large делает лёгкий Whisper base ненужным — освобождаем место автоматически.
-    if key == "whisper" and installed("whisper") and installed("whisper_base"):
-        uninstall("whisper_base")
-
 
 def uninstall(key: str) -> None:
     spec = MODELS[key]
-    if key == "whisper":
+    # CUDA-библиотеки общие для GPU-движков: убираем, только если больше никто их не использует.
+    if key in _GPU_KEYS and not any(installed(other) for other in _GPU_KEYS if other != key):
         uninstall("cuda")
     shutil.rmtree(_files_dir(spec), ignore_errors=True)
+    from .settings import app_settings
+
+    settings = app_settings()
+    raw = settings.value("enabled")
+    if raw is not None and str(raw):
+        left = {item for item in str(raw).split(",") if item and item != key}
+        settings.setValue("enabled", ",".join(sorted(left)))
+        settings.sync()
 
 
 def describe() -> list[ModelSpec]:
     # Порядок карточек в настройках.
-    order = ["gigaam", "whisper", "whisper_base", "gigaam_ml"]
+    order = [
+        "gigaam",
+        "whisper_ru",
+        "whisper_turbo",
+        "whisper_small",
+        "whisper_base",
+        "gigaam_ml",
+    ]
     return [MODELS[key] for key in order if MODELS[key].shown]

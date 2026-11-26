@@ -53,8 +53,8 @@ class Recognizer(QObject):
     def preload(self, shorts: list[str]) -> None:
         self._queue.put(("preload", shorts))
 
-    def submit(self, audio, mode: str) -> None:
-        self._queue.put(("recognize", audio, mode))
+    def submit(self, audio, mode: str, engine: str = "") -> None:
+        self._queue.put(("recognize", audio, mode, engine))
 
     def _loop(self) -> None:
         while True:
@@ -68,15 +68,28 @@ class Recognizer(QObject):
                 self.ready.emit()
                 continue
 
-            _, audio, mode = task
+            _, audio, mode, engine = task
             available = models.available_engines()
             if not available:
                 self.results.emit([("", "", None, "Не установлен ни один движок. Откройте настройки.", 0.0)])
                 continue
 
             try:
-                lang, cache = self._detect(audio, available)
-                plan = self._plan(lang, mode, available)
+                if engine and engine in available:
+                    # Движок выбран вручную: язык берём из режима окна, а Whisper
+                    # и Multilingual с «Авто» определяют его сами — без отдельного шага.
+                    lang = {"ru": "ru", "en": "en"}.get(mode, "")
+                    if lang:
+                        self.language.emit(lang)
+                    cache: dict[tuple[str, str | None], str] = {}
+                    plan = [(engine, None if engine in ("gigaam", "gigaam_ml") else lang or None)]
+                elif mode != MODE_AUTO:
+                    # Язык задан кнопкой — определять его по фразе незачем: экономим проход.
+                    cache = {}
+                    plan = self._plan("", mode, available)
+                else:
+                    lang, cache = self._detect(audio, available)
+                    plan = self._plan(lang, mode, available)
             except EngineError as exc:
                 self.results.emit([("", "", None, str(exc), 0.0)])
                 continue
@@ -107,17 +120,20 @@ class Recognizer(QObject):
         """Язык сегмента и кэш уже готовых расшифровок (Multilingual считаем один раз)."""
         cache: dict[tuple[str, str | None], str] = {}
 
-        if "whisper" in available:
-            try:
-                lang, prob = self._engines.get("whisper").detect_language(audio)
+        if available & {"whisper_turbo", "whisper_ru", "whisper_small"}:
+            for key in ("whisper_turbo", "whisper_ru", "whisper_small"):
+                if key not in available:
+                    continue
+                try:
+                    lang, prob = self._engines.get(key).detect_language(audio)
+                except EngineError:
+                    continue
                 if prob >= 0.6 and lang in ("ru", "en"):
                     self._last_lang = lang
                     self.language.emit(lang)
                     return lang, cache
                 if prob >= 0.6:
                     return "", cache
-            except EngineError:
-                pass
 
         # Whisper base определяет язык по первым словам лучше, чем алфавит Multilingual:
         # на смешанных фразах Multilingual часто уходит в кириллицу.
@@ -139,6 +155,10 @@ class Recognizer(QObject):
                 self.language.emit(lang)
             return lang, cache
 
+        # Язык так и не определился: если есть Whisper с автоопределением — пусть решает
+        # сам (для «Авто» это лучше, чем насильно считать фразу русской).
+        if available & {"whisper_turbo", "whisper_ru", "whisper_small"}:
+            return "", cache
         return "ru", cache
 
     def _plan(self, lang: str, mode: str, available: set[str]) -> list[tuple[str, str | None]]:
@@ -153,8 +173,13 @@ class Recognizer(QObject):
         if lang in ("ru", "en"):
             return self._for_language(lang, available)
         # Другой язык или неуверенность — Whisper автоопределение, иначе лёгкий Whisper / Multilingual.
-        if "whisper" in available:
-            return [("whisper", None)]
+        if "whisper_turbo" in available:
+            return [("whisper_turbo", None)]
+        if "whisper_ru" in available:
+            return [("whisper_ru", None)]
+
+        if "whisper_small" in available:
+            return [("whisper_small", None)]
         if "whisper_base" in available:
             return [("whisper_base", None)]
         if "gigaam_ml" in available:
@@ -164,18 +189,30 @@ class Recognizer(QObject):
     @staticmethod
     def _for_language(lang: str, available: set[str]) -> list[tuple[str, str | None]]:
         if lang == "ru":
+            # GigaAM v3 — самый устойчивый к шуму и всегда ставит пунктуацию.
+            # Podlodka turbo точнее на чистой речи и быстрее на видеокарте.
             if "gigaam" in available:
                 return [("gigaam", "ru")]
+            if "whisper_ru" in available:
+                return [("whisper_ru", "ru")]
             if "gigaam_ml" in available:
                 return [("gigaam_ml", None)]
-            if "whisper" in available:
-                return [("whisper", "ru")]
+
+            if "whisper_turbo" in available:
+                return [("whisper_turbo", "ru")]
+            if "whisper_small" in available:
+                return [("whisper_small", "ru")]
             if "whisper_base" in available:
                 return [("whisper_base", "ru")]
             return []
-        # Английский: сначала Whisper large, затем лёгкий Whisper base, затем Multilingual.
-        if "whisper" in available:
-            return [("whisper", "en")]
+        # Английский: turbo — то же качество, что у large, но вдвое быстрее.
+        if "whisper_turbo" in available:
+            return [("whisper_turbo", "en")]
+        if "whisper_ru" in available:
+            return [("whisper_ru", "en")]
+
+        if "whisper_small" in available:
+            return [("whisper_small", "en")]
         if "whisper_base" in available:
             return [("whisper_base", "en")]
         if "gigaam_ml" in available:

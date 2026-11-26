@@ -11,11 +11,13 @@ from PySide6.QtWidgets import (
     QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QPushButton,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from . import models, paths
@@ -37,9 +39,15 @@ MODE_KEYS = {
     MODE_EN: "mode.en",
 }
 
+# Порядок движков в меню выбора.
+ENGINE_ORDER = ["gigaam", "whisper_ru", "whisper_turbo", "whisper_small", "whisper_base", "gigaam_ml"]
+
 COMPACT_SIZE = (216, 252)
-FULL_SIZE = (561, 364)
+FULL_SIZE = (592, 408)  # размер по умолчанию для чистой установки
 MIN_FULL_SIZE = (420, 300)
+
+# Вокруг окна прозрачная тень: карточка меньше окна на эту величину с каждой стороны.
+SHADOW = 24
 
 STYLES = """
 #card {
@@ -176,6 +184,8 @@ class MainWindow(QWidget):
         self._tray_hint_shown = False
         self._compact = self.settings.value("compact", True, type=bool)
         self._mode_index = min(int(self.settings.value("mode", 0)), len(MODE_CYCLE) - 1)
+        self._engine_key = str(self.settings.value("engine", ""))
+        self._last_engine = ""  # движок, который сработал последним в режиме «Авто»
         stored_size = self.settings.value("size")
         self._full_size = (
             QSize(stored_size) if isinstance(stored_size, QSize) and not stored_size.isEmpty()
@@ -299,6 +309,14 @@ class MainWindow(QWidget):
         self.copy_btn.setProperty("class", "small")
         self.clear_btn = QPushButton(tr("btn.clear"))
         self.clear_btn.setProperty("class", "small")
+        self.autoclear_check = QCheckBox(tr("btn.autoclear"))
+        self.autoclear_check.setToolTip(tr("btn.autoclear.tip"))
+        self.autoclear_check.setChecked(self.settings.value("clear_on_start", False, type=bool))
+        self.autoclear_check.toggled.connect(self._on_autoclear)
+        self.lang_btn = QPushButton()
+        self.lang_btn.setObjectName("engine")
+        self.lang_btn.setCursor(Qt.PointingHandCursor)
+        self.lang_btn.setToolTip(tr("btn.lang.tip"))
         self.engine_btn = QPushButton()
         self.engine_btn.setObjectName("engine")
         self.engine_btn.setCursor(Qt.PointingHandCursor)
@@ -307,7 +325,9 @@ class MainWindow(QWidget):
         self.insert_check.setToolTip(tr("btn.insert.tip"))
         footer.addWidget(self.copy_btn)
         footer.addWidget(self.clear_btn)
+        footer.addWidget(self.autoclear_check)
         footer.addStretch(1)
+        footer.addWidget(self.lang_btn)
         footer.addWidget(self.engine_btn)
         footer.addWidget(self.insert_check)
         layout.addLayout(footer)
@@ -397,8 +417,15 @@ class MainWindow(QWidget):
         self.hotkey.failed.connect(lambda msg: self.set_status(msg, "#ff8fa3"))
         self.copy_btn.clicked.connect(self._copy_all)
         self.clear_btn.clicked.connect(self._clear)
-        for button in (self.engine_btn, self.engine_btn_compact):
-            button.clicked.connect(self._cycle_mode)
+        self.lang_btn.clicked.connect(
+            lambda _=False, b=self.lang_btn: self._open_menu(b, languages=True, engines=False)
+        )
+        self.engine_btn.clicked.connect(
+            lambda _=False, b=self.engine_btn: self._open_menu(b, languages=False, engines=True)
+        )
+        self.engine_btn_compact.clicked.connect(
+            lambda _=False, b=self.engine_btn_compact: self._open_menu(b, languages=True, engines=True)
+        )
         for button in (self.settings_btn, self.settings_btn_c):
             button.clicked.connect(self._open_settings)
         self.compact_btn.clicked.connect(lambda: self.set_compact(True))
@@ -419,15 +446,17 @@ class MainWindow(QWidget):
 
     def _restore_state(self) -> None:
         self.insert_check.setChecked(self.settings.value("insert", True, type=bool))
+        # Сохранённый движок мог быть удалён — тогда возвращаемся к авто.
+        if self._engine_key and self._engine_key not in models.available_engines():
+            self._engine_key = ""
         self._apply_compact(self._compact, save=False)
         # Стартуем в правом нижнем углу рабочей области — над часами, не закрывая панель задач.
         # Вокруг окна есть прозрачная тень (24 px), поэтому окно сдвигаем на её ширину:
         # карточка ложится впритык к краю, а тень справа и снизу обрезается экраном.
         area = QGuiApplication.primaryScreen().availableGeometry()
-        shadow = 24
         self.move(
-            area.right() - self.width() + shadow + 1,
-            area.bottom() - self.height() + shadow + 1,
+            area.right() - self.width() + SHADOW + 1,
+            area.bottom() - self.height() + SHADOW + 1,
         )
         self._update_mode_label()
 
@@ -448,6 +477,9 @@ class MainWindow(QWidget):
         self._apply_compact(compact, save=True)
 
     def _apply_compact(self, compact: bool, *, save: bool) -> None:
+        # Окно стоит в правом нижнем углу, поэтому при смене режима держим этот
+        # угол на месте: полно́е окно растёт вверх и влево, а не уезжает за экран.
+        before = self.geometry()
         self._compact = compact
         self.stack.setCurrentIndex(1 if compact else 0)
         if compact:
@@ -458,6 +490,7 @@ class MainWindow(QWidget):
             self.setMinimumSize(*MIN_FULL_SIZE)
             self.setMaximumSize(16777215, 16777215)
             self.resize(self._full_size)
+        self.move(before.right() - self.width() + 1, before.bottom() - self.height() + 1)
         self._clamp_to_screen()
         if save:
             self.settings.setValue("compact", compact)
@@ -467,8 +500,16 @@ class MainWindow(QWidget):
         if screen is None:
             screen = QGuiApplication.primaryScreen()
         area = screen.availableGeometry()
-        x = min(max(self.x(), area.left()), area.right() - self.width())
-        y = min(max(self.y(), area.top()), area.bottom() - self.height())
+        # Тень может свисать за рабочую область: важно, чтобы карточка осталась внутри.
+        # Границы те же, что при стартовой установке окна в угол.
+        x = min(
+            max(self.x(), area.left() - SHADOW),
+            area.right() - self.width() + SHADOW + 1,
+        )
+        y = min(
+            max(self.y(), area.top() - SHADOW),
+            area.bottom() - self.height() + SHADOW + 1,
+        )
         self.move(x, y)
 
     def _toggle_language(self) -> None:
@@ -489,10 +530,10 @@ class MainWindow(QWidget):
         self.hotkey_hint.setToolTip(tr("hotkey.tip"))
         self.copy_btn.setText(tr("btn.copy"))
         self.clear_btn.setText(tr("btn.clear"))
+        self.autoclear_check.setText(tr("btn.autoclear"))
+        self.autoclear_check.setToolTip(tr("btn.autoclear.tip"))
         self.insert_check.setText(tr("btn.insert"))
         self.insert_check.setToolTip(tr("btn.insert.tip"))
-        self.engine_btn.setToolTip(tr("btn.engine.tip"))
-        self.engine_btn_compact.setToolTip(tr("btn.engine.tip"))
         self.text.setPlaceholderText(tr("placeholder", hotkey=self.hotkey.spec.label()))
         self.credits.setText(tr("credits"))
         self._update_mode_label()
@@ -535,29 +576,122 @@ class MainWindow(QWidget):
     def current_mode(self) -> str:
         return MODE_CYCLE[self._mode_index]
 
-    def _cycle_mode(self) -> None:
-        self._mode_index = (self._mode_index + 1) % len(MODE_CYCLE)
+    def current_engine(self) -> str:
+        """Выбранный движок; пустая строка — автоматический выбор по языку."""
+        return self._engine_key
+
+    def _set_mode(self, mode: str) -> None:
+        self._mode_index = MODE_CYCLE.index(mode)
         self.settings.setValue("mode", self._mode_index)
         self._update_mode_label()
         self.recognizer.preload(self._preload_for_mode())
-        if self.current_mode() == MODE_EN and not ({"whisper", "whisper_base"} & models.available_engines()):
+        if self.current_mode() == MODE_EN and not (
+            {"whisper_turbo", "whisper_small", "whisper_base"} & models.available_engines()
+        ):
             self.set_status(tr("status.need_english"), "#ffd27a")
 
-    def _preload_for_mode(self) -> list[str]:
-        mode = self.current_mode()
-        available = models.available_engines()
-        if mode == MODE_RU:
-            order = ["gigaam", "gigaam_ml", "whisper", "whisper_base"]
-        elif mode == MODE_EN:
-            order = ["whisper", "whisper_base", "gigaam_ml"]
+    def _set_engine(self, key: str) -> None:
+        self._engine_key = key
+        self.settings.setValue("engine", key)
+        self._update_mode_label()
+        self.recognizer.preload(self._preload_for_mode())
+
+    def _open_menu(self, button, *, languages: bool, engines: bool) -> None:
+        """Меню кнопки: в полном окне кнопки раздельные, в компактном — общее меню."""
+        menu = QMenu(self)
+        menu.setToolTipsVisible(True)
+        if languages and engines:
+            self._add_section(menu, "menu.language")
+            self._fill_languages(menu)
+            menu.addSeparator()
+            self._add_section(menu, "menu.engine")
+            self._fill_engines(menu)
+        elif languages:
+            self._add_section(menu, "menu.language")
+            self._fill_languages(menu)
         else:
-            order = ["whisper", "gigaam", "whisper_base", "gigaam_ml"]
+            self._add_section(menu, "menu.engine")
+            self._fill_engines(menu)
+
+        # Окно живёт в правом нижнем углу — меню раскрываем вверх, чтобы не ушло за экран.
+        point = button.mapToGlobal(QPoint(0, 0))
+        menu.exec(QPoint(point.x(), point.y() - menu.sizeHint().height()))
+
+    @staticmethod
+    def _add_section(menu, key: str) -> None:
+        """Заголовок группы: по центру и полужирным, нажимать его нельзя."""
+        label = QLabel(tr(key))
+        label.setAlignment(Qt.AlignCenter)
+        # Фиксированная высота нужна, иначе первый такой виджет в меню схлопывается.
+        label.setFixedHeight(20)
+        label.setStyleSheet(
+            "color: #8b93a7; font-size: 8.5pt; font-weight: 600; background: transparent;"
+        )
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(label)
+        action.setEnabled(False)
+        menu.addAction(action)
+
+    def _fill_languages(self, menu) -> None:
+        for mode in MODE_CYCLE:
+            action = menu.addAction(tr(MODE_KEYS[mode]))
+            action.setCheckable(True)
+            action.setChecked(mode == self.current_mode())
+            action.setToolTip(tr(f"{MODE_KEYS[mode]}.tip"))
+            action.triggered.connect(lambda _=False, m=mode: self._set_mode(m))
+
+    def _fill_engines(self, menu) -> None:
+        available = models.available_engines()
+        action = menu.addAction(tr("engine.auto"))
+        action.setCheckable(True)
+        action.setChecked(not self._engine_key)
+        action.setToolTip(tr("engine.auto.tip"))
+        action.triggered.connect(lambda: self._set_engine(""))
+        for key in ENGINE_ORDER:
+            if key not in available:
+                continue
+            action = menu.addAction(tr(f"engine.{key}"))
+            action.setCheckable(True)
+            action.setChecked(key == self._engine_key)
+            action.setToolTip(tr(f"engine.{key}.tip"))
+            action.triggered.connect(lambda _=False, k=key: self._set_engine(k))
+
+    def _preload_for_mode(self) -> list[str]:
+        available = models.available_engines()
+        if self._engine_key:
+            return [self._engine_key] if self._engine_key in available else []
+        mode = self.current_mode()
+        if mode == MODE_RU:
+            order = ["gigaam", "whisper_ru", "gigaam_ml", "whisper_turbo", "whisper_small", "whisper_base"]
+        elif mode == MODE_EN:
+            order = ["whisper_turbo", "whisper_ru", "whisper_small", "whisper_base", "gigaam_ml"]
+        else:
+            order = ["whisper_turbo", "whisper_ru", "gigaam", "whisper_small", "whisper_base", "gigaam_ml"]
         return [key for key in order if key in available]
 
     def _update_mode_label(self) -> None:
-        mode = self.current_mode()
-        self.engine_btn.setText(tr(MODE_KEYS[mode]))
-        self.engine_btn_compact.setText(tr(MODE_KEYS[mode]))
+        # Полное окно: отдельная кнопка языка и отдельная кнопка движка.
+        self.lang_btn.setText(tr(MODE_KEYS[self.current_mode()]))
+        self.lang_btn.setToolTip(tr("btn.lang.tip"))
+        if self._engine_key:
+            engine_text = tr(f"engine.{self._engine_key}")
+        elif self._last_engine:
+            # В «Авто» показываем, кого выбрала маршрутизация в прошлый раз.
+            engine_text = f"{tr('engine.auto.short')} · {tr(f'engine.{self._last_engine}.short')}"
+        else:
+            engine_text = tr("engine.auto.short")
+        self.engine_btn.setText(engine_text)
+        self.engine_btn.setToolTip(tr("btn.engine.tip"))
+
+        # Компактное окно: одна кнопка, на ней язык, движок — в подсказке и меню.
+        self.engine_btn_compact.setText(tr(MODE_KEYS[self.current_mode()]))
+        tip = tr("btn.picker.tip")
+        if self._engine_key:
+            tip = f"{tip} · {tr(f'engine.{self._engine_key}')}"
+        elif self._last_engine:
+            short = tr(f"engine.{self._last_engine}.short")
+            tip = f"{tip} · {tr('engine.auto.short')}: {short}"
+        self.engine_btn_compact.setToolTip(tip)
 
     def _on_language(self, lang: str) -> None:
         self._last_lang = lang
@@ -576,6 +710,9 @@ class MainWindow(QWidget):
         self.recorder.start()
         if not self.recorder.running:
             return
+        # Автоочистка: каждая новая диктовка начинается с чистого окна.
+        if self.settings.value("clear_on_start", False, type=bool):
+            self.text.clear()
         self._set_recording_visual(True)
         self.tray.set_recording(True)
         self.set_status(tr("status.listening"), "#c9d2ff")
@@ -602,9 +739,12 @@ class MainWindow(QWidget):
     def _on_segment(self, audio) -> None:
         self._processing += 1
         self.set_status(tr("status.recognizing"), "#ffd27a")
-        self.recognizer.submit(audio, self.current_mode())
+        self.recognizer.submit(audio, self.current_mode(), self._engine_key)
 
     # --- результаты -------------------------------------------------------------
+
+    def _on_autoclear(self, enabled: bool) -> None:
+        self.settings.setValue("clear_on_start", enabled)
 
     def _on_results(self, results) -> None:
         self._processing = max(0, self._processing - 1)
@@ -617,6 +757,10 @@ class MainWindow(QWidget):
             self.set_status(f"{tr('status.ready')}{lang_suffix}")
 
         _short, _lang, text, error, _elapsed = results[0]
+        if _short:
+            self._last_engine = _short
+            if not self._engine_key:
+                self._update_mode_label()
         if error:
             self._append_error(error)
             return
@@ -677,6 +821,11 @@ class MainWindow(QWidget):
         available = models.available_engines()
         self._models_ready = False
         self.engines.clear_errors()
+        # Движок могли выключить в настройках — тогда возвращаемся к «Авто».
+        if self._engine_key and self._engine_key not in available:
+            self._engine_key = ""
+            self.settings.setValue("engine", "")
+            self._update_mode_label()
         if not available:
             self.set_status(tr("status.no_engines"), "#ffd27a")
             return

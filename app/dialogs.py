@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import models
+from . import hardware, models
 from .settings import app_settings
 from .i18n import tr
 from .autostart import is_enabled as autostart_enabled
@@ -76,23 +76,20 @@ QPushButton#secondary:disabled { color: #5c6373; border-color: rgba(255, 255, 25
 
 
 class _Worker(threading.Thread):
-    """Последовательная установка/удаление в фоне."""
+    """Фоновая установка движков."""
 
-    def __init__(self, dialog: "ModelsDialog", tasks: list[tuple[str, str]], cancel: threading.Event) -> None:
+    def __init__(self, dialog: "ModelsDialog", keys: list[str], cancel: threading.Event) -> None:
         super().__init__(daemon=True)
         self._dialog = dialog
-        self._tasks = tasks
+        self._keys = keys
         self._cancel = cancel
 
     def run(self) -> None:
         try:
-            for action, key in self._tasks:
+            for key in self._keys:
                 if self._cancel.is_set():
                     raise models.Cancelled("скачивание отменено")
-                if action == "install":
-                    models.install(key, self._dialog.on_progress, self._cancel)
-                else:
-                    models.uninstall(key)
+                models.install(key, self._dialog.on_progress, self._cancel)
             self._dialog.worker_done.emit("")
         except models.Cancelled:
             self._dialog.cancelled.emit()
@@ -140,12 +137,11 @@ class ModelsDialog(QDialog):
         title.setStyleSheet("color: #e8eaed; font-size: 13pt; font-weight: 600;")
         layout.addWidget(title)
 
-        hint = QLabel(tr("dlg.hint"))
+        hint = QLabel(tr("dlg.hint") + "\n" + tr("dlg.hint.extra"))
         hint.setObjectName("dialogHint")
         hint.setStyleSheet("color: #8b93a7; font-size: 9pt;")
         hint.setWordWrap(True)
         layout.addWidget(hint)
-
         hotkey_row = QHBoxLayout()
         hotkey_row.setSpacing(8)
         hotkey_title = QLabel(tr("dlg.hotkey"))
@@ -172,6 +168,20 @@ class ModelsDialog(QDialog):
 
         self._capturing = False
         self._ctrl_side = CTRL_NONE
+
+        recommend_row = QHBoxLayout()
+        recommend_row.setSpacing(8)
+        self.recommend_btn = QPushButton(tr("dlg.recommended"))
+        self.recommend_btn.setObjectName("secondary")
+        self.recommend_btn.setToolTip(tr("dlg.recommend.tip"))
+        self.recommend_btn.clicked.connect(self._on_recommend)
+        self.hardware_label = QLabel("")
+        self.hardware_label.setObjectName("dialogHint")
+        self.hardware_label.setStyleSheet("color: #8b93a7; font-size: 8.5pt;")
+        self.hardware_label.setWordWrap(True)
+        recommend_row.addWidget(self.recommend_btn)
+        recommend_row.addWidget(self.hardware_label, 1)
+        layout.addLayout(recommend_row)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -226,9 +236,12 @@ class ModelsDialog(QDialog):
 
         check = QCheckBox()
         first_run = not models.installed_keys()
+        enabled = models.enabled_keys()
         check.setChecked(
-            models.installed(spec.key) or (first_run and spec.key in DEFAULT_KEYS)
+            (models.installed(spec.key) and spec.key in enabled)
+            or (first_run and spec.key in DEFAULT_KEYS)
         )
+        check.setToolTip(tr("dlg.use.tip"))
         self._checks[spec.key] = check
         row.addWidget(check, 0, Qt.AlignTop)
 
@@ -246,12 +259,6 @@ class ModelsDialog(QDialog):
                 "color:#8fb4ff; background:rgba(91,124,250,0.15); border-radius:6px; padding:1px 7px;"
             )
             heading.addWidget(badge)
-        if spec.recommended:
-            recommended = QLabel(tr("dlg.recommended"))
-            recommended.setStyleSheet(
-                "color:#4fd1a5; background:rgba(79,209,165,0.14); border-radius:6px; padding:1px 7px;"
-            )
-            heading.addWidget(recommended)
         heading.addStretch(1)
         delete_btn = QPushButton(tr("dlg.delete"))
         delete_btn.setStyleSheet(
@@ -286,12 +293,37 @@ class ModelsDialog(QDialog):
         self._cards[spec.key] = card
         return card
 
+    def _on_recommend(self) -> None:
+        """Подбирает галочки под железо: видеокарта, память, свободное место."""
+        hw = hardware.detect()
+        keys = hardware.recommended_keys(hw)
+        for key, check in self._checks.items():
+            # Установленные движки не снимаем: иначе «Применить» предложит их удалить.
+            check.setChecked(models.installed(key) or key in keys)
+        titles = ", ".join(
+            tr(f"model.{spec.key}.title").split(" — ")[0]
+            for spec in models.describe()
+            if spec.key in keys
+        )
+        if not titles:
+            titles = tr("dlg.recommend.nothing")
+        # Честно предупреждаем, если английский будет считаться на процессоре.
+        note = ""
+        if "whisper_small" in keys and not hw.has_gpu:
+            note = "\n" + tr("dlg.recommend.slow")
+        self.hardware_label.setText(f"{hw.describe()}\n{titles}{note}")
+
     def _update_status(self, spec: models.ModelSpec) -> None:
         label = self._status_labels[spec.key]
         if models.installed(spec.key):
-            label.setText(tr("dlg.installed", mb=models.disk_usage_mb(spec.key)))
+            text = tr("dlg.installed", mb=models.disk_usage_mb(spec.key))
+            if spec.key not in models.enabled_keys():
+                text += " · " + tr("dlg.disabled")
+                label.setStyleSheet("color: #8b93a7; font-size: 8.5pt;")
+            else:
+                label.setStyleSheet("color: #4fd1a5; font-size: 8.5pt;")
             label.setObjectName("modelStatus")
-            label.setStyleSheet("color: #4fd1a5; font-size: 8.5pt;")
+            label.setText(text)
         else:
             label.setText(tr("dlg.missing", mb=spec.size_mb))
             label.setStyleSheet("color: #8b93a7; font-size: 8.5pt;")
@@ -359,27 +391,11 @@ class ModelsDialog(QDialog):
     # --- действия --------------------------------------------------------------
 
     def _apply(self) -> None:
-        tasks: list[tuple[str, str]] = []
-        to_remove: list[str] = []
-        for key, check in self._checks.items():
-            want = check.isChecked()
-            have = models.installed(key)
-            if want and not have:
-                tasks.append(("install", key))
-            elif not want and have:
-                to_remove.append(key)
-
-        if to_remove and not tasks:
-            names = ", ".join(tr(f"model.{key}.title") for key in to_remove)
-            answer = QMessageBox.question(
-                self,
-                tr("dlg.delete.title"),
-                tr("dlg.delete.question", title=names),
-            )
-            if answer != QMessageBox.Yes:
-                return
-
-        tasks.extend(("remove", key) for key in to_remove)
+        # Галочка — это «использовать движок», а не «хранить файлы»: снятая галочка
+        # ничего не удаляет, движок просто исчезает из выбора в главном окне.
+        want = {key for key, check in self._checks.items() if check.isChecked()}
+        models.set_enabled_keys(want)
+        tasks = [key for key in want if not models.installed(key)]
         if not tasks:
             self.accept()
             return

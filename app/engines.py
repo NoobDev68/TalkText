@@ -58,12 +58,15 @@ class WhisperEngine:
 
     name = "Whisper large-v3"
     short = "whisper"
+    folder = "whisper-large-v3"
 
     def __init__(self) -> None:
         _add_nvidia_dlls()
-        model_dir = ROOT / "models" / "whisper-large-v3"
+        model_dir = ROOT / "models" / self.folder
         if not (model_dir / "model.bin").is_file():
-            raise EngineError("не найдена модель models/whisper-large-v3 (запустите scripts/download_models.py whisper)")
+            raise EngineError(
+                f"не найдена модель models/{self.folder} — скачайте движок в настройках"
+            )
         self._model_dir = str(model_dir)
         try:
             self._load("cuda", "float16")
@@ -111,6 +114,30 @@ class WhisperEngine:
     def detect_language(self, audio) -> tuple[str, float]:
         language, probability, _all = self._model.detect_language(audio)
         return language, probability
+
+
+class WhisperTurboEngine(WhisperEngine):
+    """Whisper large-v3-turbo: почти качество large, но заметно быстрее."""
+
+    name = "Whisper large-v3-turbo"
+    short = "whisper_turbo"
+    folder = "whisper-large-v3-turbo"
+
+
+class WhisperRuEngine(WhisperEngine):
+    """Whisper large-v3-turbo, дообученный на русском (Podlodka): лучше GigaAM по WER."""
+
+    name = "Whisper turbo RU (Podlodka)"
+    short = "whisper_ru"
+    folder = "whisper-podlodka-turbo"
+
+
+class WhisperSmallEngine(WhisperEngine):
+    """Whisper small: небольшая модель, годится и без видеокарты."""
+
+    name = "Whisper small"
+    short = "whisper_small"
+    folder = "whisper-small"
 
 
 class GigaamEngine:
@@ -206,7 +233,9 @@ class Engines:
         if short in self._errors:
             raise EngineError(self._errors[short])
         cls = {
-            "whisper": WhisperEngine,
+            "whisper_ru": WhisperRuEngine,
+            "whisper_turbo": WhisperTurboEngine,
+            "whisper_small": WhisperSmallEngine,
             "whisper_base": WhisperBaseEngine,
             "gigaam": GigaamEngine,
             "gigaam_ml": GigaamMultilingualEngine,

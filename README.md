@@ -50,9 +50,7 @@
 - **Два языка интерфейса** — русский и английский, переключаются кнопкой
   **RU/EN** в заголовке окна, без перезапуска программы.
 
-![Полный режим](docs/screenshot.png)
-
-![Интерфейс на английском](docs/screenshot_en.png)
+![Полный режим](https://github.com/user-attachments/assets/e559c5b8-1b82-40ce-bdab-632a56217ff5)
 
 ![Компактный режим](docs/screenshot_compact.png)
 

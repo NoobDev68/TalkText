@@ -9,6 +9,7 @@ from PyInstaller.utils.hooks import collect_all
 datas = [
     ("resources/icon.png", "resources"),
     ("resources/logo.png", "resources"),
+    ("resources/logo_wordmark.png", "resources"),
     ("resources/check.png", "resources"),
     ("vendor/onnx_asr-0.12.0.dist-info", "onnx_asr-0.12.0.dist-info"),
     # без этих файлов onnx-asr падает: fbanks.npz и ONNX-препроцессоры

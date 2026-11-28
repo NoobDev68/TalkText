@@ -140,12 +140,14 @@ _STRINGS: dict[str, tuple[str, str]] = {
     "dlg.delete.tip": ("Удалить движок с диска", "Delete the engine from disk"),
     "dlg.recommended": ("Рекомендовано", "Recommended"),
     "dlg.recommend.tip": (
-        "Подобрать движки под этот компьютер: видеокарта, память, свободное место",
-        "Pick engines that fit this PC: GPU, memory, free disk space",
+        "Подобрать движки под этот компьютер: видеокарта, память, свободное место. "
+        "С ненужных движков галочки снимаются — файлы уже установленных остаются на диске",
+        "Pick engines that fit this PC: GPU, memory, free disk space. Unneeded engines "
+        "get unchecked — files of already installed ones stay on disk",
     ),
     "dlg.recommend.nothing": (
-        "мало свободного места — ничего не отмечено",
-        "not enough free disk space — nothing selected",
+        "мало свободного места на диске — галочки оставлены как были",
+        "not enough free disk space — the checkboxes were left as they were",
     ),
     "dlg.recommend.slow": (
         "видеокарты нет: английский будет считаться на процессоре — около 6 секунд на фразу",

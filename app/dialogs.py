@@ -297,9 +297,11 @@ class ModelsDialog(QDialog):
         """Подбирает галочки под железо: видеокарта, память, свободное место."""
         hw = hardware.detect()
         keys = hardware.recommended_keys(hw)
-        for key, check in self._checks.items():
-            # Установленные движки не снимаем: иначе «Применить» предложит их удалить.
-            check.setChecked(models.installed(key) or key in keys)
+        if keys:
+            # Отмечаем только рекомендованное, с остальных галочки снимаем: «Применить»
+            # не должен тянуть лишние движки. Файлы снятых движков остаются на диске.
+            for key, check in self._checks.items():
+                check.setChecked(key in keys)
         titles = ", ".join(
             tr(f"model.{spec.key}.title").split(" — ")[0]
             for spec in models.describe()

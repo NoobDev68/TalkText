@@ -1,7 +1,7 @@
 # TalkText
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Version 1.1.3](https://img.shields.io/badge/version-1.1.3-blue)
+![Version 1.1.4](https://img.shields.io/badge/version-1.1.4-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Portable](https://img.shields.io/badge/portable-no%20install-brightgreen)
 
@@ -46,7 +46,8 @@
   лёгкие движки Сбера под русский или Whisper для английского.
 - **Подбор под компьютер** — кнопка «Рекомендовано» в настройках смотрит на
   видеокарту и её память, объём ОЗУ и свободное место и сама ставит галочки на
-  движках, которые имеют смысл именно на этой машине.
+  движках, которые имеют смысл именно на этой машине, а с остальных галочки
+  снимает (файлы уже скачанных движков при этом остаются на диске).
 - **Два языка интерфейса** — русский и английский, переключаются кнопкой
   **RU/EN** в заголовке окна, без перезапуска программы.
 
@@ -71,7 +72,7 @@
 **Контрольная сумма** (SHA256):
 
 ```
-494c77344800f2de39fa181ae18a01aeea4de2a082a0e02ea00c19fec3738f0f
+731e531e9ea5b391f87a895f848b2b96d533660ed9f32f8acfc100f87a5fdb1c
 ```
 
 Проверка в PowerShell:
